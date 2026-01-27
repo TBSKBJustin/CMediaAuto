@@ -1,19 +1,49 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Upload, Play, RefreshCw, CheckCircle, AlertCircle, Loader } from 'lucide-react'
-import { getEvent, attachVideo, runWorkflow } from '../api'
+import { Upload, Play, RefreshCw, CheckCircle, AlertCircle, Loader, Grid } from 'lucide-react'
+import { getEvent, attachVideo, runWorkflow, getWorkflowProgress, getEventModules } from '../api'
+import WorkflowProgress from '../components/WorkflowProgress'
+import ModuleCard from '../components/ModuleCard'
 
 export default function EventDetail() {
   const { eventId } = useParams()
   const queryClient = useQueryClient()
   const [videoPath, setVideoPath] = useState('')
   const [showUploadModal, setShowUploadModal] = useState(false)
+  const [isPolling, setIsPolling] = useState(false)
+  const [viewMode, setViewMode] = useState('modules') // 'modules' or 'workflow'
   
   const { data: event, isLoading } = useQuery({
     queryKey: ['event', eventId],
     queryFn: () => getEvent(eventId)
   })
+  
+  // Fetch available modules
+  const { data: modulesData, refetch: refetchModules } = useQuery({
+    queryKey: ['modules', eventId],
+    queryFn: () => getEventModules(eventId),
+    enabled: !!eventId
+  })
+  
+  // Progress polling query
+  const { data: progress } = useQuery({
+    queryKey: ['progress', eventId],
+    queryFn: () => getWorkflowProgress(eventId),
+    refetchInterval: isPolling ? 1000 : false, // Poll every 1 second when active
+    enabled: isPolling
+  })
+  
+  // Auto-start polling when workflow is running
+  useEffect(() => {
+    if (progress?.status === 'running') {
+      setIsPolling(true)
+    } else if (progress?.status === 'completed' || progress?.status === 'failed') {
+      setIsPolling(false)
+      // Refresh event data when workflow completes
+      queryClient.invalidateQueries(['event', eventId])
+    }
+  }, [progress, eventId, queryClient])
   
   const attachMutation = useMutation({
     mutationFn: (path) => attachVideo(eventId, path),
@@ -27,7 +57,10 @@ export default function EventDetail() {
   const runMutation = useMutation({
     mutationFn: (force) => runWorkflow(eventId, force),
     onSuccess: () => {
+      // Start polling immediately after starting workflow
+      setIsPolling(true)
       queryClient.invalidateQueries(['event', eventId])
+      queryClient.invalidateQueries(['progress', eventId])
     }
   })
   
@@ -57,6 +90,32 @@ export default function EventDetail() {
           <p className="text-gray-600 mt-1">{event.speaker} • {event.date}</p>
         </div>
         <div className="flex gap-3">
+          {/* View Mode Toggle */}
+          <div className="flex border border-gray-300 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setViewMode('modules')}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                viewMode === 'modules' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <Grid size={16} className="inline mr-2" />
+              Modules
+            </button>
+            <button
+              onClick={() => setViewMode('workflow')}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                viewMode === 'workflow' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <Play size={16} className="inline mr-2" />
+              Workflow
+            </button>
+          </div>
+
           <button
             onClick={() => setShowUploadModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
@@ -64,27 +123,64 @@ export default function EventDetail() {
             <Upload size={20} />
             Upload Video
           </button>
-          <button
-            onClick={() => runMutation.mutate(false)}
-            disabled={!hasVideo || runMutation.isPending}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {runMutation.isPending ? (
-              <Loader className="animate-spin" size={20} />
-            ) : (
-              <Play size={20} />
-            )}
-            Run Workflow
-          </button>
+          
+          {viewMode === 'workflow' && (
+            <button
+              onClick={() => runMutation.mutate(false)}
+              disabled={!hasVideo || runMutation.isPending}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {runMutation.isPending ? (
+                <Loader className="animate-spin" size={20} />
+              ) : (
+                <Play size={20} />
+              )}
+              Run Workflow
+            </button>
+          )}
         </div>
       </div>
       
       {/* Overall Status Banner */}
       <StatusBanner status={overallStatus} hasVideo={hasVideo} />
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Event Details</h3>
+      {/* Real-time Workflow Progress */}
+      {(progress || isPolling) && viewMode === 'workflow' && (
+        <WorkflowProgress progress={progress} />
+      )}
+      
+      {/* Modules View */}
+      {viewMode === 'modules' && modulesData && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-semibold text-gray-900">Available Modules</h3>
+            <button
+              onClick={() => refetchModules()}
+              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              <RefreshCw size={16} />
+              Refresh
+            </button>
+          </div>
+          <div className="grid gap-4">
+            {modulesData.modules.map((module) => (
+              <ModuleCard
+                key={module.name}
+                eventId={eventId}
+                module={module}
+                onRefresh={refetchModules}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Workflow/Details View */}
+      {viewMode === 'workflow' && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold mb-4">Event Details</h3>
           <dl className="space-y-3">
             <div>
               <dt className="text-sm text-gray-600">Series</dt>
@@ -138,6 +234,8 @@ export default function EventDetail() {
             ))}
           </div>
         </div>
+      )}
+        </>
       )}
       
       {/* Upload Modal */}

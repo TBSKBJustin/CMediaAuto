@@ -73,6 +73,10 @@ class AIContentProcessor:
         with open(srt_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
+        return self._parse_srt_from_text(content)
+    
+    def _parse_srt_from_text(self, content: str) -> List[Dict]:
+        """Parse SRT text content into structured data"""
         # Split by double newline to get subtitle blocks
         blocks = re.split(r'\n\n+', content.strip())
         subtitles = []
@@ -135,53 +139,96 @@ class AIContentProcessor:
             
             self.logger.info(f"Parsed {len(subtitles)} subtitle segments")
             
-            # Correct in batches
+            # Use batch processing for better reliability (smaller batches = better format compliance)
             corrected_subtitles = []
-            system_prompt = """You are a subtitle correction assistant. Your task is to:
-1. Fix spelling errors and typos
-2. Correct grammar mistakes
-3. Fix mistranscribed words that don't make sense in context
-4. Keep the meaning and timing the same
-5. Respond ONLY with the corrected text, no explanations
-
-Keep the corrections minimal and natural."""
+            batch_size = 10  # Process 10 subtitle blocks at a time
             
-            for i in range(0, len(subtitles), batch_size):
-                batch = subtitles[i:i + batch_size]
+            for batch_start in range(0, len(subtitles), batch_size):
+                batch_end = min(batch_start + batch_size, len(subtitles))
+                batch = subtitles[batch_start:batch_end]
                 
-                # Prepare batch text
-                batch_text = "\n---\n".join([
-                    f"[{sub['index']}] {sub['text']}"
-                    for sub in batch
-                ])
+                # Convert batch to SRT text
+                srt_text = ""
+                for sub in batch:
+                    srt_text += f"{sub['index']}\n"
+                    srt_text += f"{sub['timestamp']}\n"
+                    srt_text += f"{sub['text']}\n\n"
                 
-                prompt = f"""Correct the following subtitle segments. Return them in the same format with [index] prefix:
+                # Prepare strict prompt with example
+                system_prompt = """You are a subtitle text correction assistant. Fix ONLY the subtitle text content while preserving the exact SRT format.
 
-{batch_text}"""
+CRITICAL RULES:
+1) Keep the EXACT number of subtitle blocks
+2) Keep ALL timestamps unchanged
+3) Keep ALL index numbers unchanged  
+4) Keep ALL blank lines between blocks
+5) ONLY fix: typos, ASR errors, grammar, unnatural wording
+6) Output VALID SRT format
+
+Example input:
+1
+00:00:00,000 --> 00:00:02,300
+李政階妹平安
+
+2
+00:00:02,300 --> 00:00:05,900
+感謝祝我們來到他的面前
+
+Example output (same structure, corrected text):
+1
+00:00:00,000 --> 00:00:02,300
+李政道妹平安
+
+2
+00:00:02,300 --> 00:00:05,900
+感謝主我們來到他的面前"""
                 
-                self.logger.info(f"Correcting batch {i//batch_size + 1}/{(len(subtitles) + batch_size - 1)//batch_size}")
+                prompt = f"""Correct the subtitle text. Output MUST have exactly {len(batch)} blocks with same timestamps and numbers.
+
+Input SRT ({len(batch)} blocks):
+<<<
+{srt_text.strip()}
+>>>
+
+Output corrected SRT (MUST be {len(batch)} blocks, same format):"""
                 
-                corrected_text = self._call_ollama(prompt, system_prompt)
+                self.logger.info(f"Correcting batch {batch_start//batch_size + 1} ({len(batch)} segments)")
                 
-                if not corrected_text:
-                    # Fallback: keep original
+                corrected_batch_text = self._call_ollama(prompt, system_prompt)
+                
+                if not corrected_batch_text:
+                    self.logger.warning(f"AI correction failed for batch, keeping original")
                     corrected_subtitles.extend(batch)
                     continue
                 
-                # Parse corrected text
-                corrected_lines = corrected_text.split('\n---\n')
-                
-                for j, sub in enumerate(batch):
-                    if j < len(corrected_lines):
-                        # Extract corrected text (remove [index] prefix)
-                        corrected = re.sub(r'^\[\d+\]\s*', '', corrected_lines[j].strip())
-                        corrected_subtitles.append({
-                            'index': sub['index'],
-                            'timestamp': sub['timestamp'],
-                            'text': corrected if corrected else sub['text']
-                        })
+                # Parse AI response
+                try:
+                    corrected_batch = self._parse_srt_from_text(corrected_batch_text)
+                    
+                    # Strict validation: must match batch size
+                    if len(corrected_batch) != len(batch):
+                        self.logger.warning(
+                            f"Batch structure mismatch (expected {len(batch)}, got {len(corrected_batch)}), "
+                            f"keeping original batch"
+                        )
+                        corrected_subtitles.extend(batch)
                     else:
-                        corrected_subtitles.append(sub)
+                        # Verify timestamps match
+                        timestamps_match = all(
+                            orig['timestamp'] == corr['timestamp'] 
+                            for orig, corr in zip(batch, corrected_batch)
+                        )
+                        if not timestamps_match:
+                            self.logger.warning("Timestamps changed in AI output, keeping original batch")
+                            corrected_subtitles.extend(batch)
+                        else:
+                            # Success - use corrected batch
+                            corrected_subtitles.extend(corrected_batch)
+                            self.logger.info(f"Batch corrected successfully")
+                            
+                except Exception as e:
+                    self.logger.error(f"Failed to parse batch response: {e}, keeping original")
+                    corrected_subtitles.extend(batch)
             
             # Write corrected SRT
             output_path = Path(output_dir)

@@ -62,6 +62,11 @@ class WorkflowRun(BaseModel):
     force: bool = False
 
 
+class ModuleRun(BaseModel):
+    input_files: Optional[Dict[str, str]] = None
+    force: bool = False
+
+
 @app.get('/api/status')
 async def get_status():
     """Get system status"""
@@ -128,19 +133,6 @@ async def create_event(event_data: EventCreate):
         
         event = event_manager.load_event(event_id)
         return event
-    
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.post('/api/events/{event_id}/run')
-async def run_event_workflow(event_id: str, workflow_data: Optional[WorkflowRun] = None):
-    """Run workflow for event"""
-    force = workflow_data.force if workflow_data else False
-    
-    try:
-        results = workflow_controller.run_event(event_id, force=force)
-        return results
     
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -278,6 +270,157 @@ async def check_dependency(dep_key: str):
         'installed': is_installed,
         'version': version
     }
+
+
+@app.post('/api/events/{event_id}/workflow/run')
+async def run_workflow(event_id: str, workflow_data: WorkflowRun):
+    """Run workflow for an event"""
+    import threading
+    
+    # Check if event exists
+    event = event_manager.load_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail='Event not found')
+    
+    # Check if already running
+    progress = workflow_controller.get_progress(event_id)
+    if progress and progress.get('status') == 'running':
+        raise HTTPException(status_code=409, detail='Workflow already running')
+    
+    # Run workflow in background thread
+    def run_in_background():
+        try:
+            workflow_controller.run_event(event_id, force=workflow_data.force)
+        except Exception as e:
+            # Update progress with error
+            workflow_controller._update_progress(event_id, {
+                "status": "failed",
+                "error": str(e),
+                "details": f"Workflow failed: {str(e)}"
+            })
+    
+    thread = threading.Thread(target=run_in_background, daemon=True)
+    thread.start()
+    
+    return {'message': 'Workflow started', 'event_id': event_id}
+
+
+@app.get('/api/events/{event_id}/progress')
+async def get_workflow_progress(event_id: str):
+    """Get real-time workflow progress"""
+    # Check if event exists
+    event = event_manager.load_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail='Event not found')
+    
+    # Get current progress
+    progress = workflow_controller.get_progress(event_id)
+    
+    if not progress:
+        # No progress yet, check if completed
+        state = workflow_controller.state_store.get_workflow_state(event_id)
+        if state and state.get('overall_status') == 'completed':
+            return {
+                'status': 'completed',
+                'progress_percent': 100,
+                'current_module': None,
+                'current_step': 'Completed',
+                'details': 'Workflow already completed'
+            }
+        else:
+            return {
+                'status': 'pending',
+                'progress_percent': 0,
+                'current_module': None,
+                'current_step': 'Not started',
+                'details': 'Workflow not started yet'
+            }
+    
+    return progress
+
+
+@app.post('/api/events/{event_id}/modules/{module_name}/run')
+async def run_single_module(event_id: str, module_name: str, module_data: ModuleRun):
+    """Run a single module independently"""
+    import threading
+    
+    # Check if event exists
+    event = event_manager.load_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail='Event not found')
+    
+    # Run module in background thread
+    def run_in_background():
+        try:
+            workflow_controller.run_single_module(
+                event_id=event_id,
+                module_name=module_name,
+                input_files=module_data.input_files,
+                force=module_data.force
+            )
+        except Exception as e:
+            # Log error
+            workflow_controller.logger.error(f"Module {module_name} failed: {e}")
+    
+    thread = threading.Thread(target=run_in_background, daemon=True)
+    thread.start()
+    
+    return {'message': f'Module {module_name} started', 'event_id': event_id, 'module': module_name}
+
+
+@app.get('/api/events/{event_id}/modules/{module_name}/inputs')
+async def get_module_inputs(event_id: str, module_name: str):
+    """Get available inputs for a module"""
+    # Check if event exists
+    event = event_manager.load_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail='Event not found')
+    
+    try:
+        inputs_info = workflow_controller.get_module_inputs(event_id, module_name)
+        return inputs_info
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get('/api/events/{event_id}/modules')
+async def list_event_modules(event_id: str):
+    """List all available modules with their status and inputs"""
+    event = event_manager.load_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail='Event not found')
+    
+    # Define all available modules
+    all_modules = [
+        {'name': 'subtitles', 'label': 'Generate Subtitles', 'description': 'Generate SRT/VTT subtitles using Whisper'},
+        {'name': 'ai_content', 'label': 'AI Content Processing', 'description': 'Correct subtitles and generate summary'},
+        {'name': 'thumbnail_compose', 'label': 'Compose Thumbnail', 'description': 'Generate thumbnail image'},
+        {'name': 'publish_youtube', 'label': 'Publish to YouTube', 'description': 'Upload video to YouTube'},
+        {'name': 'publish_website', 'label': 'Publish to Website', 'description': 'Generate website post'},
+    ]
+    
+    # Add status and inputs info for each module
+    for module in all_modules:
+        module_name = module['name']
+        
+        # Get execution status
+        result = workflow_controller.state_store.get_module_result(event_id, module_name)
+        if result:
+            module['status'] = result.get('status', 'unknown')
+            module['last_run'] = result.get('timestamp', None)
+            if result.get('output_file'):
+                module['output_file'] = result['output_file']
+        else:
+            module['status'] = 'not_run'
+        
+        # Get input requirements
+        inputs_info = workflow_controller.get_module_inputs(event_id, module_name)
+        module['inputs'] = inputs_info
+        
+        # Check if enabled in event config
+        module['enabled'] = event.get('modules', {}).get(module_name, False)
+    
+    return {'modules': all_modules}
 
 
 @app.get('/api/models/whisper')

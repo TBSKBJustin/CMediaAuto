@@ -13,6 +13,7 @@ class StateStore:
     
     def __init__(self, events_dir: str = "events"):
         self.events_dir = Path(events_dir)
+        self._progress_cache = {}  # In-memory progress cache
     
     def save_module_result(self, event_id: str, module_name: str, result: Dict) -> None:
         """
@@ -91,6 +92,40 @@ class StateStore:
             if "module_results" in state:
                 state["modules"] = state.pop("module_results")
             return state
+    
+    def save_progress(self, event_id: str, progress_data: Dict) -> None:
+        """Save current workflow progress (in-memory and file)"""
+        # Cache in memory for fast access
+        self._progress_cache[event_id] = progress_data
+        
+        # Also save to file
+        event_path = self.events_dir / event_id
+        if event_path.exists():
+            progress_file = event_path / "logs" / "progress.json"
+            progress_data["updated_at"] = datetime.now().isoformat()
+            with open(progress_file, 'w', encoding='utf-8') as f:
+                json.dump(progress_data, f, indent=2, ensure_ascii=False)
+    
+    def get_progress(self, event_id: str) -> Optional[Dict]:
+        """Get current workflow progress"""
+        # Check memory cache first
+        if event_id in self._progress_cache:
+            return self._progress_cache[event_id]
+        
+        # Try loading from file
+        progress_file = self.events_dir / event_id / "logs" / "progress.json"
+        if progress_file.exists():
+            with open(progress_file, 'r', encoding='utf-8') as f:
+                progress = json.load(f)
+                self._progress_cache[event_id] = progress
+                return progress
+        
+        return None
+    
+    def clear_progress(self, event_id: str) -> None:
+        """Clear progress data for an event"""
+        if event_id in self._progress_cache:
+            del self._progress_cache[event_id]
     
     def _compute_overall_status(self, results: Dict) -> str:
         """

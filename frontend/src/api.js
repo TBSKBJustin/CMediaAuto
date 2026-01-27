@@ -24,7 +24,12 @@ export const createEvent = async (eventData) => {
 }
 
 export const runWorkflow = async (eventId, force = false) => {
-  const { data } = await api.post(`/events/${eventId}/run`, { force })
+  const { data } = await api.post(`/events/${eventId}/workflow/run`, { force })
+  return data
+}
+
+export const getWorkflowProgress = async (eventId) => {
+  const { data } = await api.get(`/events/${eventId}/progress`)
   return data
 }
 
@@ -63,6 +68,25 @@ export const getWhisperModels = async () => {
 
 export const getOllamaModels = async () => {
   const { data } = await api.get('/models/ollama')
+  return data
+}
+
+// Modules
+export const getEventModules = async (eventId) => {
+  const { data } = await api.get(`/events/${eventId}/modules`)
+  return data
+}
+
+export const getModuleInputs = async (eventId, moduleName) => {
+  const { data } = await api.get(`/events/${eventId}/modules/${moduleName}/inputs`)
+  return data
+}
+
+export const runSingleModule = async (eventId, moduleName, inputFiles = null, force = false) => {
+  const { data } = await api.post(`/events/${eventId}/modules/${moduleName}/run`, {
+    input_files: inputFiles,
+    force
+  })
   return data
 }
 
