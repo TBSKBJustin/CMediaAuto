@@ -22,7 +22,8 @@ export default function EventCreate() {
       thumbnail_ai: true,
       thumbnail_compose: true,
       subtitles: true,
-      ai_content: true,
+      subtitle_correction: true,
+      content_summary: true,
       publish_youtube: false,
       publish_website: false,
     }
@@ -249,9 +250,50 @@ export default function EventCreate() {
         </div>
         
         <div className="bg-white rounded-lg shadow p-6 space-y-4">
-          <h3 className="text-lg font-semibold">AI Content Processing</h3>
+          <h3 className="text-lg font-semibold">Subtitle Correction</h3>
           <p className="text-sm text-gray-600">
-            Use Ollama to correct subtitles and generate content summaries
+            Use AI to correct spelling errors and transcription mistakes in subtitles
+          </p>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              AI Model
+            </label>
+            <select
+              name="ai_model"
+              value={formData.ai_model}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={!ollamaModelsData?.models?.length}
+            >
+              {ollamaModelsData?.models?.length > 0 ? (
+                ollamaModelsData.models.map(model => (
+                  <option key={model.value} value={model.value}>
+                    {model.label}
+                  </option>
+                ))
+              ) : (
+                <option value="">
+                  {ollamaModelsData?.service_available === false 
+                    ? 'Ollama not running - start with: ollama serve'
+                    : 'No models found - download with: ollama pull qwen2.5'}
+                </option>
+              )}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              {ollamaModelsData?.service_available === true
+                ? `${ollamaModelsData.models.length} model(s) available`
+                : ollamaModelsData?.service_available === false
+                ? 'Ollama service not available'
+                : 'Checking Ollama...'}
+            </p>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow p-6 space-y-4">
+          <h3 className="text-lg font-semibold">Content Summary</h3>
+          <p className="text-sm text-gray-600">
+            Use AI to generate content summaries for thumbnails and social media posts
           </p>
           
           <div>
@@ -288,62 +330,20 @@ export default function EventCreate() {
             </p>
           </div>
           
-          <div className="space-y-3 border-t pt-4">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                name="ai_correct_subtitles"
-                checked={formData.ai_correct_subtitles}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  ai_correct_subtitles: e.target.checked
-                }))}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-              />
-              <div>
-                <span className="text-sm font-medium text-gray-700">Correct Subtitles</span>
-                <p className="text-xs text-gray-500">
-                  Fix spelling errors and transcription mistakes
-                </p>
-              </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Summary Length
             </label>
-            
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                name="ai_generate_summary"
-                checked={formData.ai_generate_summary}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  ai_generate_summary: e.target.checked
-                }))}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-              />
-              <div>
-                <span className="text-sm font-medium text-gray-700">Generate Summary</span>
-                <p className="text-xs text-gray-500">
-                  Create a content summary for thumbnails and posts
-                </p>
-              </div>
-            </label>
-            
-            {formData.ai_generate_summary && (
-              <div className="ml-7">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Summary Length
-                </label>
-                <select
-                  name="ai_summary_length"
-                  value={formData.ai_summary_length}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="short">Short (2-3 paragraphs)</option>
-                  <option value="medium">Medium (4-5 paragraphs)</option>
-                  <option value="long">Long (6-8 paragraphs)</option>
-                </select>
-              </div>
-            )}
+            <select
+              name="ai_summary_length"
+              value={formData.ai_summary_length}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="short">Short (2-3 paragraphs)</option>
+              <option value="medium">Medium (4-5 paragraphs)</option>
+              <option value="long">Long (6-8 paragraphs)</option>
+            </select>
           </div>
         </div>
         
@@ -369,16 +369,22 @@ export default function EventCreate() {
               onChange={() => handleModuleToggle('subtitles')}
             />
             <ModuleToggle
+              name="subtitle_correction"
+              label="Correct Subtitles (AI)"
+              checked={formData.modules.subtitle_correction}
+              onChange={() => handleModuleToggle('subtitle_correction')}
+            />
+            <ModuleToggle
+              name="content_summary"
+              label="Generate Content Summary (AI)"
+              checked={formData.modules.content_summary}
+              onChange={() => handleModuleToggle('content_summary')}
+            />
+            <ModuleToggle
               name="publish_youtube"
               label="Publish to YouTube"
               checked={formData.modules.publish_youtube}
               onChange={() => handleModuleToggle('publish_youtube')}
-            />
-            <ModuleToggle
-              name="ai_content"
-              label="AI Content Processing"
-              checked={formData.modules.ai_content}
-              onChange={() => handleModuleToggle('ai_content')}
             />
             <ModuleToggle
               name="publish_website"

@@ -141,6 +141,10 @@ class WorkflowController:
                 return self._run_thumbnail_compose(event_id, event_config)
             elif module_name == "subtitles":
                 return self._run_subtitles(event_id, event_config)
+            elif module_name == "subtitle_correction":
+                return self._run_subtitle_correction(event_id, event_config)
+            elif module_name == "content_summary":
+                return self._run_content_summary(event_id, event_config)
             elif module_name == "ai_content":
                 return self._run_ai_content(event_id, event_config)
             elif module_name == "publish_youtube":
@@ -240,6 +244,36 @@ class WorkflowController:
                 result["available_files"]["video"] = video_files[0]
                 result["auto_detected"] = True
                 
+        elif module_name == "subtitle_correction":
+            result["required_inputs"] = ["srt"]
+            # Check for generated SRT
+            if output_dir.exists():
+                srt_files = list(output_dir.glob("*.srt"))
+                # Prefer non-corrected SRT
+                for srt in srt_files:
+                    if "_corrected" not in srt.name:
+                        result["available_files"]["srt"] = str(srt)
+                        result["auto_detected"] = True
+                        break
+                if not result["auto_detected"] and srt_files:
+                    result["available_files"]["srt"] = str(srt_files[0])
+                    result["auto_detected"] = True
+                    
+        elif module_name == "content_summary":
+            result["required_inputs"] = ["srt"]
+            # Check for corrected or original SRT
+            if output_dir.exists():
+                srt_files = list(output_dir.glob("*.srt"))
+                # Prefer corrected SRT
+                for srt in srt_files:
+                    if "_corrected" in srt.name:
+                        result["available_files"]["srt"] = str(srt)
+                        result["auto_detected"] = True
+                        break
+                if not result["auto_detected"] and srt_files:
+                    result["available_files"]["srt"] = str(srt_files[0])
+                    result["auto_detected"] = True
+                    
         elif module_name == "ai_content":
             result["required_inputs"] = ["srt"]
             # Check for generated SRT
@@ -436,6 +470,170 @@ class WorkflowController:
         
         except Exception as e:
             self.logger.error(f"Subtitle module error: {str(e)}")
+            return {
+                "status": "failed",
+                "error": str(e),
+                "timestamp": self._get_timestamp()
+            }
+    
+    def _run_subtitle_correction(self, event_id: str, event_config: Dict) -> Dict:
+        """Run subtitle correction module using AI"""
+        self.logger.info("Running subtitle correction...")
+        
+        try:
+            from modules.content.ai_processor import AIContentProcessor
+            
+            # Setup directories
+            event_dir = Path("events") / event_id
+            output_dir = event_dir / "output"
+            
+            # Get input SRT (manual or auto-detect)
+            manual_inputs = event_config.get('_manual_inputs', {})
+            if 'srt' in manual_inputs:
+                original_srt = manual_inputs['srt']
+                self.logger.info(f"Using manually specified SRT: {original_srt}")
+            else:
+                # Find the subtitle file
+                subtitle_files = list(output_dir.glob("*.srt"))
+                if not subtitle_files:
+                    return {
+                        "status": "failed",
+                        "error": "No subtitle file found. Run subtitles module first or specify SRT file.",
+                        "timestamp": self._get_timestamp()
+                    }
+                
+                # Use the first non-corrected SRT file
+                original_srt = None
+                for srt_file in subtitle_files:
+                    if "_corrected" not in srt_file.stem:
+                        original_srt = str(srt_file)
+                        break
+                
+                if not original_srt:
+                    original_srt = str(subtitle_files[0])
+            
+            self.logger.info(f"Correcting subtitle file: {original_srt}")
+            
+            # Get AI settings from event config
+            ai_settings = event_config.get("ai_content_settings", {})
+            model = ai_settings.get("model", "qwen2.5:latest")
+            
+            self.logger.info(f"Using AI model: {model}")
+            
+            # Initialize processor
+            processor = AIContentProcessor(model=model, logger=self.logger)
+            
+            # Process content (only correction)
+            success, error, output_files = processor.process_content(
+                srt_path=original_srt,
+                output_dir=str(output_dir),
+                correct_subtitles=True,
+                generate_summary=False,
+                summary_length="medium"
+            )
+            
+            if success:
+                self.logger.info(f"Subtitle correction completed: {output_files}")
+                return {
+                    "status": "success",
+                    "message": "Subtitles corrected successfully",
+                    "model": model,
+                    "output_files": output_files,
+                    "timestamp": self._get_timestamp()
+                }
+            else:
+                self.logger.error(f"Subtitle correction failed: {error}")
+                return {
+                    "status": "failed",
+                    "error": error,
+                    "timestamp": self._get_timestamp()
+                }
+        
+        except Exception as e:
+            self.logger.error(f"Subtitle correction error: {str(e)}")
+            return {
+                "status": "failed",
+                "error": str(e),
+                "timestamp": self._get_timestamp()
+            }
+    
+    def _run_content_summary(self, event_id: str, event_config: Dict) -> Dict:
+        """Run content summary generation module using AI"""
+        self.logger.info("Running content summary generation...")
+        
+        try:
+            from modules.content.ai_processor import AIContentProcessor
+            
+            # Setup directories
+            event_dir = Path("events") / event_id
+            output_dir = event_dir / "output"
+            
+            # Get input SRT (manual or auto-detect)
+            manual_inputs = event_config.get('_manual_inputs', {})
+            if 'srt' in manual_inputs:
+                srt_file = manual_inputs['srt']
+                self.logger.info(f"Using manually specified SRT: {srt_file}")
+            else:
+                # Find subtitle file (prefer corrected)
+                subtitle_files = list(output_dir.glob("*.srt"))
+                if not subtitle_files:
+                    return {
+                        "status": "failed",
+                        "error": "No subtitle file found. Run subtitles or subtitle_correction module first.",
+                        "timestamp": self._get_timestamp()
+                    }
+                
+                # Prefer corrected SRT
+                srt_file = None
+                for srt in subtitle_files:
+                    if "_corrected" in srt.stem:
+                        srt_file = str(srt)
+                        break
+                
+                if not srt_file:
+                    srt_file = str(subtitle_files[0])
+            
+            self.logger.info(f"Generating summary from: {srt_file}")
+            
+            # Get AI settings from event config
+            ai_settings = event_config.get("ai_content_settings", {})
+            model = ai_settings.get("model", "qwen2.5:latest")
+            summary_length = ai_settings.get("summary_length", "medium")
+            
+            self.logger.info(f"Using AI model: {model}, summary length: {summary_length}")
+            
+            # Initialize processor
+            processor = AIContentProcessor(model=model, logger=self.logger)
+            
+            # Process content (only summary)
+            success, error, output_files = processor.process_content(
+                srt_path=srt_file,
+                output_dir=str(output_dir),
+                correct_subtitles=False,
+                generate_summary=True,
+                summary_length=summary_length
+            )
+            
+            if success:
+                self.logger.info(f"Content summary generated: {output_files}")
+                return {
+                    "status": "success",
+                    "message": "Content summary generated successfully",
+                    "model": model,
+                    "summary_length": summary_length,
+                    "output_files": output_files,
+                    "timestamp": self._get_timestamp()
+                }
+            else:
+                self.logger.error(f"Content summary generation failed: {error}")
+                return {
+                    "status": "failed",
+                    "error": error,
+                    "timestamp": self._get_timestamp()
+                }
+        
+        except Exception as e:
+            self.logger.error(f"Content summary generation error: {str(e)}")
             return {
                 "status": "failed",
                 "error": str(e),

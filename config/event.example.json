@@ -23,6 +23,8 @@
     "thumbnail_ai": true,
     "thumbnail_compose": true,
     "subtitles": true,
+    "subtitle_correction": true,
+    "content_summary": true,
     "publish_youtube": true,
     "publish_website": true,
     "archive": false

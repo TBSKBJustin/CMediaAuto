@@ -254,6 +254,16 @@ export default function EventDetail() {
 }
 
 function formatModuleName(name) {
+  const customNames = {
+    'subtitle_correction': 'Correct Subtitles (AI)',
+    'content_summary': 'Generate Content Summary (AI)',
+    'ai_content': 'AI Content Processing'
+  }
+  
+  if (customNames[name]) {
+    return customNames[name]
+  }
+  
   return name.split('_').map(word => 
     word.charAt(0).toUpperCase() + word.slice(1)
   ).join(' ')
