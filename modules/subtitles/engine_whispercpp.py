@@ -238,20 +238,28 @@ class WhisperCppEngine:
                 return False, f"whisper.cpp error: {result.stderr[:200]}", {}
             
             # Collect output files
-            # whisper.cpp outputs with pattern: filename.{format} in working directory
+            # whisper.cpp outputs files based on the input filename
+            # For example: input.wav.srt, input.wav.vtt
+            input_filename = Path(input_path).name
+            
             for fmt in formats:
                 # Try different possible output names
                 possible_names = [
-                    output_dir_path / f"{base_name}.{fmt}",
-                    output_dir_path / f"{input_path}.{fmt}",
+                    output_dir_path / f"{input_filename}.{fmt}",  # audio.wav.srt
+                    output_dir_path / f"{base_name}.{fmt}",       # audio.srt
+                    output_dir_path / Path(input_path).name.replace(Path(input_path).suffix, f".{fmt}"),  # audio.srt (without .wav)
                 ]
                 
                 for output_path in possible_names:
                     if output_path.exists():
                         output_files[fmt] = str(output_path)
+                        self.logger.info(f"Found {fmt} file: {output_path}")
                         break
             
             if not output_files:
+                # List all files in output directory for debugging
+                all_files = list(output_dir_path.iterdir())
+                self.logger.warning(f"No subtitle files found. Files in output dir: {[f.name for f in all_files]}")
                 return False, "No output files generated", {}
             
             self.logger.info(f"Generated subtitles: {list(output_files.keys())}")
