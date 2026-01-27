@@ -93,6 +93,33 @@ class DependencyManager:
             return 'windows'
         return 'unknown'
     
+    def _load_custom_paths(self) -> Dict[str, str]:
+        """Load custom paths from config file"""
+        import yaml
+        
+        custom_paths = {}
+        config_path = Path('config/config.yaml')
+        
+        try:
+            if not config_path.exists():
+                return custom_paths
+            
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f)
+            
+            # Load whisper.cpp custom path
+            whispercpp_config = config.get('modules', {}).get('subtitles', {}).get('whispercpp', {})
+            whisper_path = whispercpp_config.get('custom_path') or whispercpp_config.get('whisper_bin')
+            if whisper_path and os.path.exists(whisper_path):
+                custom_paths['whisper.cpp'] = whisper_path
+            
+            # Add more dependency custom paths here as needed
+            
+        except Exception as e:
+            logging.warning(f"Failed to load custom paths from config: {e}")
+        
+        return custom_paths
+    
     def check_dependency(self, dep_key: str, custom_path: Optional[str] = None) -> Tuple[bool, Optional[str]]:
         """
         Check if a dependency is installed
@@ -150,8 +177,12 @@ class DependencyManager:
         """Check all dependencies"""
         results = {}
         
+        # Load custom paths from config
+        custom_paths = self._load_custom_paths()
+        
         for dep_key, dep_info in self.DEPENDENCIES.items():
-            is_installed, version = self.check_dependency(dep_key)
+            custom_path = custom_paths.get(dep_key)
+            is_installed, version = self.check_dependency(dep_key, custom_path)
             results[dep_key] = {
                 'name': dep_info['name'],
                 'description': dep_info['description'],
