@@ -45,13 +45,22 @@ class AIContentProcessor:
             self.logger.error(f"Failed to check model: {e}")
             return False
     
-    def _call_ollama(self, prompt: str, system_prompt: str = "") -> Optional[str]:
-        """Call Ollama API and get response"""
+    def _call_ollama(self, prompt: str, system_prompt: str = "", keep_alive: str = "5m") -> Optional[str]:
+        """Call Ollama API and get response
+        
+        Args:
+            prompt: The prompt to send to the model
+            system_prompt: System prompt for the model
+            keep_alive: Duration to keep model in memory after request (default: "5m")
+                        Set to "0" to unload immediately after request
+                        Examples: "5m" (5 minutes), "1h" (1 hour), "0" (unload immediately)
+        """
         try:
             payload = {
                 "model": self.model,
                 "prompt": prompt,
-                "stream": False
+                "stream": False,
+                "keep_alive": keep_alive
             }
             if system_prompt:
                 payload["system"] = system_prompt
@@ -67,6 +76,25 @@ class AIContentProcessor:
         except Exception as e:
             self.logger.error(f"Failed to call Ollama: {e}")
             return None
+    
+    def unload_model(self) -> bool:
+        """Explicitly unload the model from memory
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            self.logger.info(f"Unloading model {self.model} from memory")
+            payload = {
+                "model": self.model,
+                "prompt": "",
+                "keep_alive": "0"
+            }
+            response = requests.post(self.api_url, json=payload, timeout=10)
+            return response.status_code == 200
+        except Exception as e:
+            self.logger.error(f"Failed to unload model: {e}")
+            return False
     
     def _parse_srt(self, srt_path: str) -> List[Dict]:
         """Parse SRT file into structured data"""
@@ -261,7 +289,7 @@ Output corrected SRT (MUST be {len(batch)} blocks, same format):"""
         Generate content summary from subtitles in multiple languages
         
         Args:
-            srt_path: Path to SRT file (preferably corrected version)
+            srt_path: Path to subtitle file (SRT, TXT, or VTT - TXT is preferred for better text extraction)
             output_dir: Directory to save summary
             summary_length: "short", "medium", or "long"
             languages: List of language codes (e.g., ["en", "zh", "es"]). If None, defaults to ["en"]
@@ -299,12 +327,23 @@ Output corrected SRT (MUST be {len(batch)} blocks, same format):"""
             
             self.logger.info(f"Generating summary from: {srt_path} in languages: {languages}")
             
-            # Parse and extract all text
-            subtitles = self._parse_srt(srt_path)
-            if not subtitles:
-                return False, "Failed to parse SRT file", {}
+            # Try to find and use TXT file first (better text extraction)
+            source_file = Path(srt_path)
+            txt_file = source_file.with_suffix('.txt')
             
-            full_text = ' '.join([sub['text'] for sub in subtitles])
+            if txt_file.exists():
+                self.logger.info(f"Found TXT file, using it for better text extraction: {txt_file}")
+                with open(txt_file, 'r', encoding='utf-8') as f:
+                    full_text = f.read()
+                source_file = txt_file
+            else:
+                # Fallback to parsing SRT/VTT file
+                self.logger.info(f"No TXT file found, parsing subtitle file: {srt_path}")
+                subtitles = self._parse_srt(srt_path)
+                if not subtitles:
+                    return False, "Failed to parse subtitle file", {}
+                
+                full_text = ' '.join([sub['text'] for sub in subtitles])
             
             # Determine summary length instructions
             length_instructions = {
@@ -318,7 +357,7 @@ Output corrected SRT (MUST be {len(batch)} blocks, same format):"""
             output_path = Path(output_dir)
             output_path.mkdir(parents=True, exist_ok=True)
             
-            base_name = Path(srt_path).stem
+            base_name = source_file.stem
             if base_name.endswith('_corrected'):
                 base_name = base_name[:-10]
             elif base_name.endswith('_audio'):
@@ -331,35 +370,34 @@ Output corrected SRT (MUST be {len(batch)} blocks, same format):"""
                 lang_name = language_names.get(lang_code, lang_code)
                 self.logger.info(f"Generating {lang_name} summary...")
                 
-                system_prompt = f"""You are creating a SERMON TRANSCRIPT SUMMARY.
+                system_prompt = f"""You are creating a faithful summary of a sermon transcript.
 
-Your job is NOT to create a theologically complete sermon summary.
-Your job is to faithfully reflect ONLY what the preacher actually said.
+Your task: Produce a "compressed sermon notes version" — not a rewritten sermon and not a theological commentary.
 
-Rules:
-1. Do NOT add Bible verses unless they were clearly mentioned.
-2. Do NOT invent structure (like "first day / second day") unless explicitly stated.
-3. If something is unclear in the transcript, say "The preacher seems to imply…" instead of completing it.
-4. Focus on:
-   - What passages were actually read or explained
-   - How the preacher defined key terms (like "covenant")
-   - What historical flow of the Bible he described
-   - How he connected it to Jesus or the New Covenant (only if explicitly stated)
-
-This is a historical-faithful summary task, not a devotional or theological writing task.
 Write the entire summary in {lang_name}."""
                 
-                prompt = f"""Please create {length_instruction} of the following sermon transcript.
+                prompt = f"""Please create {length_instruction} of the following sermon, following these requirements strictly:
+
+1. Summarize only what is explicitly stated in the sermon. Do not add biblical interpretations, theological views, or personal explanations that were not mentioned by the speaker.
+
+2. Do not expand, elaborate, or systematize the content theologically. Only compress what the preacher already said.
+
+3. If the preacher uses examples, illustrations, or background explanations, they may be briefly retained, but do not introduce any new examples or background information.
+
+4. Do not include application-style conclusions such as "this shows that," "this symbolizes," or "this reminds us," unless the preacher explicitly said them.
+
+5. Organize the summary into clear paragraphs for readability, but ensure the meaning remains completely faithful to the original sermon.
+
+6. If a section of the sermon is long, extract only its core point without inferring any unstated implications.
+
+7. If something in the sermon is presented merely as an example or illustration, do not turn it into a separate main point; it may only be mentioned briefly within the relevant section.
+
+8. Do not elevate the preacher's illustrations into formal theological concepts or doctrinal statements.
 
 IMPORTANT: Write the entire summary in {lang_name}.
 
+Sermon transcript:
 {full_text}
-
-Remember:
-- Only include what was explicitly stated
-- Use "The preacher seems to imply..." for unclear parts
-- Do not add theological interpretation beyond what was said
-- Focus on the actual content, structure, and flow of the sermon
 
 Summary in {lang_name}:"""
                 
@@ -377,7 +415,7 @@ Summary in {lang_name}:"""
                 
                 with open(summary_file, 'w', encoding='utf-8') as f:
                     f.write(f"# Content Summary ({lang_name})\n\n")
-                    f.write(f"Generated from: {Path(srt_path).name}\n")
+                    f.write(f"Generated from: {source_file.name}\n")
                     f.write(f"Summary length: {summary_length}\n")
                     f.write(f"Language: {lang_name}\n\n")
                     f.write("---\n\n")
@@ -385,6 +423,25 @@ Summary in {lang_name}:"""
                 
                 self.logger.info(f"{lang_name} summary saved to: {summary_file}")
                 output_files[f"summary_{lang_code}"] = str(summary_file)
+            
+            # Generate image prompt for thumbnail (only once, use first language)
+            if languages:
+                self.logger.info("Generating image prompt for thumbnail...")
+                image_prompt = self._generate_image_prompt(full_text)
+                
+                if image_prompt:
+                    # Save image prompt
+                    prompt_file = output_path / f"{base_name}_image_prompt.txt"
+                    with open(prompt_file, 'w', encoding='utf-8') as f:
+                        f.write(f"# Image Generation Prompt for Thumbnail\n\n")
+                        f.write(f"Generated from sermon content\n\n")
+                        f.write("---\n\n")
+                        f.write(image_prompt)
+                    
+                    self.logger.info(f"Image prompt saved to: {prompt_file}")
+                    output_files["image_prompt"] = str(prompt_file)
+                else:
+                    self.logger.warning("Failed to generate image prompt")
             
             if not output_files:
                 return False, "Failed to generate any summaries", {}
@@ -396,6 +453,51 @@ Summary in {lang_name}:"""
             self.logger.error(error_msg, exc_info=True)
             return False, error_msg, {}
     
+    def _generate_image_prompt(self, sermon_text: str) -> Optional[str]:
+        """
+        Generate an image prompt for thumbnail background based on sermon content
+        
+        Args:
+            sermon_text: Full sermon transcript text
+            
+        Returns:
+            Image generation prompt string, or None if failed
+        """
+        try:
+            system_prompt = """You are an AI assistant that creates image generation prompts for sermon thumbnails.
+
+Your task: Based on the sermon content, create a vivid, artistic prompt that captures the main theme visually.
+
+Guidelines:
+1. Focus on the central theme or main message
+2. Use concrete visual elements (landscape, objects, symbols, atmosphere)
+3. Keep it appropriate for church context
+4. Avoid depicting specific people or faces
+5. Use cinematic, artistic language
+6. Length: 2-3 sentences maximum
+
+Output ONLY the image prompt, nothing else."""
+
+            prompt = f"""Based on this sermon transcript, create an image generation prompt for the thumbnail background:
+
+{sermon_text[:3000]}
+
+Create a prompt that visually represents the sermon's main theme. Output ONLY the prompt text:"""
+
+            image_prompt = self._call_ollama(prompt, system_prompt, keep_alive="5m")
+            
+            if image_prompt:
+                # Clean up the prompt
+                image_prompt = image_prompt.strip()
+                self.logger.info(f"Generated image prompt: {image_prompt[:100]}...")
+                return image_prompt
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate image prompt: {e}")
+            return None
+    
     def process_content(
         self,
         srt_path: str,
@@ -404,7 +506,8 @@ Summary in {lang_name}:"""
         generate_summary: bool = True,
         summary_length: str = "medium",
         summary_languages: List[str] = None,
-        batch_size: int = 10
+        batch_size: int = 10,
+        unload_model_after: bool = False
     ) -> Tuple[bool, Optional[str], Dict[str, str]]:
         """
         Complete AI content processing pipeline
@@ -417,34 +520,41 @@ Summary in {lang_name}:"""
             summary_length: Summary length ("short", "medium", "long")
             summary_languages: List of language codes for summaries (e.g., ["en", "zh"])
             batch_size: Batch size for subtitle correction
+            unload_model_after: If True, explicitly unload model from memory after processing
             
         Returns:
             (success, error_message, output_files)
         """
         output_files = {}
         
-        # Step 1: Correct subtitles
-        if correct_subtitles:
-            success, error, files = self.correct_subtitles(srt_path, output_dir, batch_size)
-            if not success:
-                return False, f"Subtitle correction failed: {error}", output_files
-            output_files.update(files)
+        try:
+            # Step 1: Correct subtitles
+            if correct_subtitles:
+                success, error, files = self.correct_subtitles(srt_path, output_dir, batch_size)
+                if not success:
+                    return False, f"Subtitle correction failed: {error}", output_files
+                output_files.update(files)
+                
+                # Use corrected version for summary
+                srt_for_summary = files.get("corrected_srt", srt_path)
+            else:
+                srt_for_summary = srt_path
             
-            # Use corrected version for summary
-            srt_for_summary = files.get("corrected_srt", srt_path)
-        else:
-            srt_for_summary = srt_path
+            # Step 2: Generate summary
+            if generate_summary:
+                success, error, files = self.generate_summary(
+                    srt_for_summary, 
+                    output_dir, 
+                    summary_length,
+                    summary_languages
+                )
+                if not success:
+                    return False, f"Summary generation failed: {error}", output_files
+                output_files.update(files)
+            
+            return True, None, output_files
         
-        # Step 2: Generate summary
-        if generate_summary:
-            success, error, files = self.generate_summary(
-                srt_for_summary, 
-                output_dir, 
-                summary_length,
-                summary_languages
-            )
-            if not success:
-                return False, f"Summary generation failed: {error}", output_files
-            output_files.update(files)
-        
-        return True, None, output_files
+        finally:
+            # Unload model if requested
+            if unload_model_after:
+                self.unload_model()

@@ -33,6 +33,10 @@ class EventManager:
         ai_generate_summary: bool = True,
         ai_summary_length: str = "medium",
         ai_summary_languages: List[str] = None,
+        ai_unload_model_after: bool = True,
+        thumbnail_ai_backend: str = "stable-diffusion",
+        thumbnail_ai_url: str = "http://localhost:7860",
+        thumbnail_ai_model: Optional[str] = None,
         modules: Optional[Dict[str, bool]] = None
     ) -> str:
         """
@@ -54,6 +58,10 @@ class EventManager:
             ai_generate_summary: Enable summary generation
             ai_summary_length: Summary length (short/medium/long)
             ai_summary_languages: List of language codes for summaries
+            ai_unload_model_after: Unload model from memory after processing
+            thumbnail_ai_backend: Image generation backend (stable-diffusion/comfyui/fallback)
+            thumbnail_ai_url: API URL for image generation service
+            thumbnail_ai_model: Model name for image generation (optional)
             modules: Module toggle configuration (optional)
             
         Returns:
@@ -101,8 +109,12 @@ class EventManager:
                 "correct_subtitles": ai_correct_subtitles,
                 "generate_summary": ai_generate_summary,
                 "summary_length": ai_summary_length,
-                "summary_languages": ai_summary_languages
+                "summary_languages": ai_summary_languages,
+                "unload_model_after": ai_unload_model_after
             },
+            "thumbnail_ai_backend": thumbnail_ai_backend,
+            "thumbnail_ai_url": thumbnail_ai_url,
+            "thumbnail_ai_model": thumbnail_ai_model,
             "scripture": scripture,
             "speaker": speaker,
             "language": language,

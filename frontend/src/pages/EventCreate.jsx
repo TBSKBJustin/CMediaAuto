@@ -5,6 +5,35 @@ import { createEvent, getWhisperModels, getOllamaModels } from '../api'
 
 export default function EventCreate() {
   const navigate = useNavigate()
+  
+  // Load default settings from localStorage
+  const getDefaultSettings = () => {
+    const savedSettings = localStorage.getItem('cmas_global_settings')
+    if (savedSettings) {
+      const parsed = JSON.parse(savedSettings)
+      return {
+        subtitle_max_length: parsed.subtitle_max_length || 84,
+        subtitle_split_on_word: parsed.subtitle_split_on_word !== undefined ? parsed.subtitle_split_on_word : true,
+        ai_model: parsed.ai_model || 'qwen2.5:latest',
+        ai_unload_model_after: parsed.ai_unload_model_after !== undefined ? parsed.ai_unload_model_after : true,
+        thumbnail_ai_backend: parsed.thumbnail_ai_backend || 'stable-diffusion',
+        thumbnail_ai_url: parsed.thumbnail_ai_url || 'http://localhost:7860',
+        thumbnail_ai_model: parsed.thumbnail_ai_model || '',
+      }
+    }
+    return {
+      subtitle_max_length: 84,
+      subtitle_split_on_word: true,
+      ai_model: 'qwen2.5:latest',
+      ai_unload_model_after: true,
+      thumbnail_ai_backend: 'stable-diffusion',
+      thumbnail_ai_url: 'http://localhost:7860',
+      thumbnail_ai_model: '',
+    }
+  }
+  
+  const defaults = getDefaultSettings()
+  
   const [formData, setFormData] = useState({
     title: '',
     speaker: '',
@@ -12,13 +41,17 @@ export default function EventCreate() {
     scripture: '',
     language: 'auto',
     whisper_model: 'base',
-    subtitle_max_length: 84,
-    subtitle_split_on_word: true,
-    ai_model: 'qwen2.5:latest',
+    subtitle_max_length: defaults.subtitle_max_length,
+    subtitle_split_on_word: defaults.subtitle_split_on_word,
+    ai_model: defaults.ai_model,
     ai_correct_subtitles: true,
     ai_generate_summary: true,
     ai_summary_length: 'medium',
     ai_summary_languages: ['en'],
+    ai_unload_model_after: defaults.ai_unload_model_after,
+    thumbnail_ai_backend: defaults.thumbnail_ai_backend,
+    thumbnail_ai_url: defaults.thumbnail_ai_url,
+    thumbnail_ai_model: defaults.thumbnail_ai_model,
     modules: {
       thumbnail_ai: true,
       thumbnail_compose: true,
@@ -288,6 +321,27 @@ export default function EventCreate() {
                 ? 'Ollama service not available'
                 : 'Checking Ollama...'}
             </p>
+          </div>
+          
+          <div className="flex items-start">
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                name="ai_unload_model_after"
+                checked={formData.ai_unload_model_after}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  ai_unload_model_after: e.target.checked
+                }))}
+                className="w-4 h-4 mt-0.5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-700">Unload Model After Processing</span>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Release GPU/CPU resources immediately after tasks complete. Enable for single tasks or when resources are limited. Disable for batch processing.
+                </p>
+              </div>
+            </label>
           </div>
         </div>
         

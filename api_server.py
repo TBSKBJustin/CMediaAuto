@@ -52,6 +52,10 @@ class EventCreate(BaseModel):
     ai_generate_summary: bool = True
     ai_summary_length: str = "medium"
     ai_summary_languages: List[str] = ["en"]
+    ai_unload_model_after: bool = True
+    thumbnail_ai_backend: str = "stable-diffusion"  # "stable-diffusion", "comfyui", "fallback"
+    thumbnail_ai_url: str = "http://localhost:7860"
+    thumbnail_ai_model: Optional[str] = None
     modules: Optional[Dict[str, Any]] = None
 
 
@@ -130,6 +134,10 @@ async def create_event(event_data: EventCreate):
             ai_generate_summary=event_data.ai_generate_summary,
             ai_summary_length=event_data.ai_summary_length,
             ai_summary_languages=event_data.ai_summary_languages,
+            ai_unload_model_after=event_data.ai_unload_model_after,
+            thumbnail_ai_backend=event_data.thumbnail_ai_backend,
+            thumbnail_ai_url=event_data.thumbnail_ai_url,
+            thumbnail_ai_model=event_data.thumbnail_ai_model,
             modules=event_data.modules
         )
         

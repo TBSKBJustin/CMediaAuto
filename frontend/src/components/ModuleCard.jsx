@@ -6,6 +6,7 @@ import { runSingleModule } from '../api'
 export default function ModuleCard({ eventId, module, onRefresh }) {
   const [expanded, setExpanded] = useState(false)
   const [manualInputs, setManualInputs] = useState({})
+  const [forceRerun, setForceRerun] = useState(false)
   const queryClient = useQueryClient()
 
   const runMutation = useMutation({
@@ -13,7 +14,7 @@ export default function ModuleCard({ eventId, module, onRefresh }) {
       eventId,
       module.name,
       Object.keys(manualInputs).length > 0 ? manualInputs : null,
-      false
+      forceRerun
     ),
     onSuccess: () => {
       queryClient.invalidateQueries(['event', eventId])
@@ -73,17 +74,34 @@ export default function ModuleCard({ eventId, module, onRefresh }) {
             </span>
           )}
           
+          {/* Force rerun checkbox for completed tasks */}
+          {module.status === 'success' && (
+            <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer mr-2">
+              <input
+                type="checkbox"
+                checked={forceRerun}
+                onChange={(e) => setForceRerun(e.target.checked)}
+                className="w-3 h-3 text-blue-600 rounded"
+              />
+              <span>Re-run</span>
+            </label>
+          )}
+          
           <button
             onClick={() => runMutation.mutate()}
             disabled={runMutation.isPending}
-            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
+              module.status === 'success' && forceRerun
+                ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                : 'bg-blue-600 hover:bg-blue-700 text-white'
+            }`}
           >
             {runMutation.isPending ? (
               <Loader className="animate-spin" size={16} />
             ) : (
               <Play size={16} />
             )}
-            Run
+            {module.status === 'success' && forceRerun ? 'Re-run' : 'Run'}
           </button>
 
           <button

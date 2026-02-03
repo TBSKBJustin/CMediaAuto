@@ -153,7 +153,7 @@ class WhisperCppEngine:
             return False, f"Model not found: {self.model_path}", {}
         
         if formats is None:
-            formats = ["srt", "vtt"]
+            formats = ["srt", "vtt", "txt"]
         
         # Try direct transcription first
         success, error, output = self._transcribe(

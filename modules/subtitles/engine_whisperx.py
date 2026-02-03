@@ -63,7 +63,7 @@ class WhisperXEngine:
             return False, "WhisperX not installed", {}
         
         if formats is None:
-            formats = ["srt", "vtt"]
+            formats = ["srt", "vtt", "txt"]
         
         self.logger.info(f"Generating subtitles with WhisperX: {video_path}")
         
@@ -111,6 +111,8 @@ class WhisperXEngine:
                     self._save_srt(result["segments"], file_path)
                 elif fmt == "vtt":
                     self._save_vtt(result["segments"], file_path)
+                elif fmt == "txt":
+                    self._save_txt(result["segments"], file_path)
                 elif fmt == "json":
                     self._save_json(result, file_path)
                 
@@ -146,6 +148,13 @@ class WhisperXEngine:
                 
                 f.write(f"{start} --> {end}\n")
                 f.write(f"{text}\n\n")
+    
+    def _save_txt(self, segments: List[dict], output_path: Path):
+        """Save subtitles as plain text (no timestamps)"""
+        with open(output_path, 'w', encoding='utf-8') as f:
+            for segment in segments:
+                text = segment['text'].strip()
+                f.write(f"{text}\n")
     
     def _save_json(self, result: dict, output_path: Path):
         """Save full result as JSON"""

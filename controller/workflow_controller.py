@@ -308,12 +308,93 @@ class WorkflowController:
     def _run_thumbnail_ai(self, event_id: str, event_config: Dict) -> Dict:
         """Run AI thumbnail generation module"""
         self.logger.info("Running thumbnail AI generation...")
-        # Placeholder for actual implementation
-        return {
-            "status": "success",
-            "message": "AI thumbnail generated",
-            "timestamp": self._get_timestamp()
-        }
+        
+        try:
+            from modules.thumbnail.ai_generator_ollama import ImageGenerator
+            
+            # Setup directories
+            event_dir = Path("events") / event_id
+            logs_dir = event_dir / "logs"
+            output_dir = event_dir / "output"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Read image prompt from summary output
+            image_prompt_files = list(logs_dir.glob("*_image_prompt.txt"))
+            
+            if not image_prompt_files:
+                self.logger.warning("No image prompt found, skipping AI generation")
+                return {
+                    "status": "skipped",
+                    "message": "No image prompt available from summary",
+                    "timestamp": self._get_timestamp()
+                }
+            
+            # Read the prompt
+            prompt_file = image_prompt_files[0]
+            with open(prompt_file, 'r', encoding='utf-8') as f:
+                prompt = f.read().strip()
+            
+            self.logger.info(f"Using image prompt: {prompt[:100]}...")
+            
+            # Get AI generation config
+            backend = event_config.get("thumbnail_ai_backend", "stable-diffusion")
+            base_url = event_config.get("thumbnail_ai_url", "http://localhost:7860")
+            model = event_config.get("thumbnail_ai_model", None)
+            
+            # Initialize generator
+            generator = ImageGenerator(
+                backend=backend,
+                base_url=base_url,
+                model=model
+            )
+            
+            # Output path
+            bg_image_path = output_dir / "ai_background.png"
+            
+            # Find fallback asset (optional)
+            fallback = None
+            assets_dir = Path("assets")
+            bg_dir = assets_dir / "backgrounds"
+            if bg_dir.exists():
+                bg_files = list(bg_dir.glob("*.jpg")) + list(bg_dir.glob("*.png"))
+                if bg_files:
+                    fallback = str(bg_files[0])
+            
+            # Generate image
+            success, error = generator.generate_image(
+                prompt=prompt,
+                output_path=str(bg_image_path),
+                width=1280,
+                height=720,
+                fallback_asset=fallback
+            )
+            
+            if success:
+                self.logger.info(f"AI background generated: {bg_image_path}")
+                return {
+                    "status": "success",
+                    "message": "AI background image generated",
+                    "output_file": str(bg_image_path),
+                    "prompt": prompt,
+                    "backend": backend,
+                    "timestamp": self._get_timestamp()
+                }
+            else:
+                self.logger.error(f"AI generation failed: {error}")
+                return {
+                    "status": "failed",
+                    "error": error,
+                    "prompt": prompt,
+                    "timestamp": self._get_timestamp()
+                }
+        
+        except Exception as e:
+            self.logger.error(f"Thumbnail AI module error: {str(e)}")
+            return {
+                "status": "failed",
+                "error": str(e),
+                "timestamp": self._get_timestamp()
+            }
     
     def _run_thumbnail_compose(self, event_id: str, event_config: Dict) -> Dict:
         """Run thumbnail composition module"""
@@ -338,24 +419,38 @@ class WorkflowController:
             # Initialize composer
             composer = ThumbnailComposer()
             
-            # Look for optional assets
-            assets_dir = Path("assets")
+            # Look for AI-generated background first
             background = None
-            logo = None
-            
-            # Try to find a background image
-            bg_dir = assets_dir / "backgrounds"
-            if bg_dir.exists():
-                bg_files = list(bg_dir.glob("*.jpg")) + list(bg_dir.glob("*.png"))
-                if bg_files:
-                    background = str(bg_files[0])
+            ai_bg = output_dir / "ai_background.png"
+            if ai_bg.exists():
+                background = str(ai_bg)
+                self.logger.info("Using AI-generated background")
+            else:
+                # Fallback to assets directory
+                assets_dir = Path("assets")
+                bg_dir = assets_dir / "backgrounds"
+                if bg_dir.exists():
+                    bg_files = list(bg_dir.glob("*.jpg")) + list(bg_dir.glob("*.png"))
+                    if bg_files:
+                        background = str(bg_files[0])
+                        self.logger.info(f"Using fallback background: {background}")
             
             # Try to find a logo
+            logo = None
+            assets_dir = Path("assets")
             logo_dir = assets_dir / "logos"
             if logo_dir.exists():
                 logo_files = list(logo_dir.glob("*.png"))
                 if logo_files:
                     logo = str(logo_files[0])
+            
+            # Try to find pastor portrait
+            pastor = None
+            pastor_dir = assets_dir / "pastor"
+            if pastor_dir.exists():
+                pastor_files = list(pastor_dir.glob("*.jpg")) + list(pastor_dir.glob("*.png"))
+                if pastor_files:
+                    pastor = str(pastor_files[0])
             
             # Compose thumbnail
             success, error = composer.compose(
@@ -363,6 +458,7 @@ class WorkflowController:
                 title=title,
                 scripture=scripture if scripture else None,
                 background=background,
+                pastor=pastor,
                 logo=logo
             )
             
@@ -372,6 +468,7 @@ class WorkflowController:
                     "status": "success",
                     "message": "Thumbnail composed successfully",
                     "output_file": str(thumbnail_path),
+                    "used_ai_background": ai_bg.exists(),
                     "timestamp": self._get_timestamp()
                 }
             else:
@@ -517,8 +614,9 @@ class WorkflowController:
             # Get AI settings from event config
             ai_settings = event_config.get("ai_content_settings", {})
             model = ai_settings.get("model", "qwen2.5:latest")
+            unload_model_after = ai_settings.get("unload_model_after", True)
             
-            self.logger.info(f"Using AI model: {model}")
+            self.logger.info(f"Using AI model: {model}, unload_after: {unload_model_after}")
             
             # Initialize processor
             processor = AIContentProcessor(model=model, logger=self.logger)
@@ -529,7 +627,8 @@ class WorkflowController:
                 output_dir=str(output_dir),
                 correct_subtitles=True,
                 generate_summary=False,
-                summary_length="medium"
+                summary_length="medium",
+                unload_model_after=unload_model_after
             )
             
             if success:
@@ -568,30 +667,44 @@ class WorkflowController:
             event_dir = Path("events") / event_id
             output_dir = event_dir / "output"
             
-            # Get input SRT (manual or auto-detect)
+            # Get input subtitle file (manual or auto-detect)
+            # Priority: TXT (best) > corrected SRT > regular SRT
             manual_inputs = event_config.get('_manual_inputs', {})
             if 'srt' in manual_inputs:
                 srt_file = manual_inputs['srt']
-                self.logger.info(f"Using manually specified SRT: {srt_file}")
+                self.logger.info(f"Using manually specified subtitle file: {srt_file}")
             else:
-                # Find subtitle file (prefer corrected)
-                subtitle_files = list(output_dir.glob("*.srt"))
-                if not subtitle_files:
-                    return {
-                        "status": "failed",
-                        "error": "No subtitle file found. Run subtitles or subtitle_correction module first.",
-                        "timestamp": self._get_timestamp()
-                    }
+                # Try to find TXT file first (best for summary generation)
+                txt_files = list(output_dir.glob("*.txt"))
+                subtitle_file = None
                 
-                # Prefer corrected SRT
-                srt_file = None
-                for srt in subtitle_files:
-                    if "_corrected" in srt.stem:
-                        srt_file = str(srt)
+                for txt in txt_files:
+                    # Skip summary files
+                    if "_summary" not in txt.stem:
+                        subtitle_file = str(txt)
+                        self.logger.info(f"Found TXT file for summary: {subtitle_file}")
                         break
                 
-                if not srt_file:
-                    srt_file = str(subtitle_files[0])
+                if not subtitle_file:
+                    # Fallback to SRT files (prefer corrected)
+                    subtitle_files = list(output_dir.glob("*.srt"))
+                    if not subtitle_files:
+                        return {
+                            "status": "failed",
+                            "error": "No subtitle file found. Run subtitles module first.",
+                            "timestamp": self._get_timestamp()
+                        }
+                    
+                    # Prefer corrected SRT
+                    for srt in subtitle_files:
+                        if "_corrected" in srt.stem:
+                            subtitle_file = str(srt)
+                            break
+                    
+                    if not subtitle_file:
+                        subtitle_file = str(subtitle_files[0])
+                
+                srt_file = subtitle_file
             
             self.logger.info(f"Generating summary from: {srt_file}")
             
@@ -600,8 +713,9 @@ class WorkflowController:
             model = ai_settings.get("model", "qwen2.5:latest")
             summary_length = ai_settings.get("summary_length", "medium")
             summary_languages = ai_settings.get("summary_languages", ["en"])
+            unload_model_after = ai_settings.get("unload_model_after", True)
             
-            self.logger.info(f"Using AI model: {model}, summary length: {summary_length}, languages: {summary_languages}")
+            self.logger.info(f"Using AI model: {model}, summary length: {summary_length}, languages: {summary_languages}, unload_after: {unload_model_after}")
             
             # Initialize processor
             processor = AIContentProcessor(model=model, logger=self.logger)
@@ -613,7 +727,8 @@ class WorkflowController:
                 correct_subtitles=False,
                 generate_summary=True,
                 summary_length=summary_length,
-                summary_languages=summary_languages
+                summary_languages=summary_languages,
+                unload_model_after=unload_model_after
             )
             
             if success:
@@ -686,8 +801,9 @@ class WorkflowController:
             correct_subtitles = ai_settings.get("correct_subtitles", True)
             generate_summary = ai_settings.get("generate_summary", True)
             summary_length = ai_settings.get("summary_length", "medium")
+            unload_model_after = ai_settings.get("unload_model_after", True)
             
-            self.logger.info(f"AI settings: model={model}, correct={correct_subtitles}, summary={generate_summary}")
+            self.logger.info(f"AI settings: model={model}, correct={correct_subtitles}, summary={generate_summary}, unload_after={unload_model_after}")
             
             # Initialize processor
             processor = AIContentProcessor(model=model, logger=self.logger)
@@ -698,7 +814,8 @@ class WorkflowController:
                 output_dir=str(output_dir),
                 correct_subtitles=correct_subtitles,
                 generate_summary=generate_summary,
-                summary_length=summary_length
+                summary_length=summary_length,
+                unload_model_after=unload_model_after
             )
             
             if success:

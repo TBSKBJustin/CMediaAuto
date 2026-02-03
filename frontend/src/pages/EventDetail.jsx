@@ -13,6 +13,7 @@ export default function EventDetail() {
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [isPolling, setIsPolling] = useState(false)
   const [viewMode, setViewMode] = useState('modules') // 'modules' or 'workflow'
+  const [forceRerun, setForceRerun] = useState(false)
   
   const { data: event, isLoading } = useQuery({
     queryKey: ['event', eventId],
@@ -125,18 +126,37 @@ export default function EventDetail() {
           </button>
           
           {viewMode === 'workflow' && (
-            <button
-              onClick={() => runMutation.mutate(false)}
-              disabled={!hasVideo || runMutation.isPending}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {runMutation.isPending ? (
-                <Loader className="animate-spin" size={20} />
-              ) : (
-                <Play size={20} />
+            <div className="flex items-center gap-3">
+              {/* Re-run checkbox for completed workflows */}
+              {overallStatus === 'completed' && (
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    checked={forceRerun}
+                    onChange={(e) => setForceRerun(e.target.checked)}
+                    className="w-4 h-4 text-orange-600 rounded"
+                  />
+                  <span>Force Re-run All</span>
+                </label>
               )}
-              Run Workflow
-            </button>
+              
+              <button
+                onClick={() => runMutation.mutate(forceRerun)}
+                disabled={!hasVideo || runMutation.isPending}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed $\{
+                  overallStatus === 'completed' && forceRerun
+                    ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {runMutation.isPending ? (
+                  <Loader className="animate-spin" size={20} />
+                ) : (
+                  <Play size={20} />
+                )}
+                {overallStatus === 'completed' && forceRerun ? 'Re-run Workflow' : 'Run Workflow'}
+              </button>
+            </div>
           )}
         </div>
       </div>
