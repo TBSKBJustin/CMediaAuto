@@ -479,6 +479,13 @@ class WorkflowController:
             logo_size = thumb_settings.get("logo_size", {"width": 200, "height": 200})
             pastor_size = thumb_settings.get("pastor_size", {"width": 250, "height": 250})
             
+            # Position settings with defaults
+            logo_position = thumb_settings.get("logo_position", {"align": "top-left", "padding": 30})
+            pastor_position = thumb_settings.get("pastor_position", {"align": "bottom-left", "padding": 30})
+            title_position = thumb_settings.get("title_position", {"align": "center", "padding": 50, "y_offset": -50})
+            subtitle_position = thumb_settings.get("subtitle_position", {"align": "center", "padding": 50, "y_offset": 50})
+            meeting_position = thumb_settings.get("meeting_position", {"align": "top-right", "padding": 50})
+            
             # Output path
             thumbnail_path = output_dir / "thumbnail.jpg"
             
@@ -549,7 +556,12 @@ class WorkflowController:
                 subtitle_font_path=subtitle_font_path,
                 meeting_font_path=meeting_font_path,
                 logo_size=logo_size,
-                pastor_size=pastor_size
+                pastor_size=pastor_size,
+                logo_position=logo_position,
+                pastor_position=pastor_position,
+                title_position=title_position,
+                subtitle_position=subtitle_position,
+                meeting_position=meeting_position
             )
             
             if success:

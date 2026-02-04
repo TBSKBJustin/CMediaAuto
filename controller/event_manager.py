@@ -37,6 +37,7 @@ class EventManager:
         thumbnail_ai_backend: str = "ollama",
         thumbnail_ai_url: str = "http://localhost:11434",
         thumbnail_ai_model: Optional[str] = "x/z-image-turbo",
+        thumbnail_settings: Optional[Dict[str, Any]] = None,
         modules: Optional[Dict[str, bool]] = None
     ) -> str:
         """
@@ -62,6 +63,7 @@ class EventManager:
             thumbnail_ai_backend: Image generation backend (stable-diffusion/comfyui/fallback)
             thumbnail_ai_url: API URL for image generation service
             thumbnail_ai_model: Model name for image generation (optional)
+            thumbnail_settings: Thumbnail composition settings (fonts, sizes, elements, images)
             modules: Module toggle configuration (optional)
             
         Returns:
@@ -118,6 +120,7 @@ class EventManager:
             "thumbnail_ai_backend": thumbnail_ai_backend,
             "thumbnail_ai_url": thumbnail_ai_url,
             "thumbnail_ai_model": thumbnail_ai_model,
+            "thumbnail_settings": thumbnail_settings or {},
             "scripture": scripture,
             "speaker": speaker,
             "language": language,

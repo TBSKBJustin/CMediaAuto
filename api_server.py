@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 import sys
+import logging
 from pathlib import Path
 
 # Add project root to path
@@ -15,6 +16,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 from controller.event_manager import EventManager
 from controller.workflow_controller import WorkflowController
 from utils.dependency_manager import DependencyManager
+
+# Setup logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Church Media Automation System",
@@ -56,6 +61,7 @@ class EventCreate(BaseModel):
     thumbnail_ai_backend: str = "ollama"  # "ollama", "stable-diffusion", "comfyui", "fallback"
     thumbnail_ai_url: str = "http://localhost:11434"
     thumbnail_ai_model: Optional[str] = "x/z-image-turbo"
+    thumbnail_settings: Optional[Dict[str, Any]] = None
     modules: Optional[Dict[str, Any]] = None
 
 
@@ -138,6 +144,7 @@ async def create_event(event_data: EventCreate):
             thumbnail_ai_backend=event_data.thumbnail_ai_backend,
             thumbnail_ai_url=event_data.thumbnail_ai_url,
             thumbnail_ai_model=event_data.thumbnail_ai_model,
+            thumbnail_settings=event_data.thumbnail_settings,
             modules=event_data.modules
         )
         
@@ -146,18 +153,6 @@ async def create_event(event_data: EventCreate):
     
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.post('/api/events/{event_id}/attach')
-async def attach_video(event_id: str, video_data: VideoAttach):
-    """Attach video to event"""
-    # Check if event exists
-    event = event_manager.load_event(event_id)
-    if not event:
-        raise HTTPException(status_code=404, detail='Event not found')
-    
-    # Validate video path exists
-    video_path = Path(video_data.video_path)
 
 
 @app.put('/api/events/{event_id}/config')
@@ -232,7 +227,14 @@ async def attach_video(event_id: str, video_data: VideoAttach):
     # Add video to event
     success = event_manager.add_video_input(event_id, str(video_path.absolute()))
     if success:
-        return {'message': 'Video attached successfully', 'path': str(video_path)}
+        # Reload event to get updated data
+        updated_event = event_manager.load_event(event_id)
+        logger.info(f"Video attached successfully. Video files: {updated_event.get('inputs', {}).get('video_files', [])}")
+        return {
+            'message': 'Video attached successfully', 
+            'path': str(video_path),
+            'video_count': len(updated_event.get('inputs', {}).get('video_files', []))
+        }
     else:
         raise HTTPException(status_code=400, detail='Failed to attach video')
 

@@ -16,11 +16,24 @@ export default function EventDetail() {
   const [isPolling, setIsPolling] = useState(false)
   const [viewMode, setViewMode] = useState('modules') // 'modules' or 'workflow'
   const [forceRerun, setForceRerun] = useState(false)
+  const [uploadSuccess, setUploadSuccess] = useState(false)
   
   const { data: event, isLoading } = useQuery({
     queryKey: ['event', eventId],
     queryFn: () => getEvent(eventId)
   })
+  
+  // Debug: log event data when it changes
+  useEffect(() => {
+    if (event) {
+      console.log('Event data updated:', {
+        event_id: event.event_id,
+        input_video: event.input_video,
+        video_files: event.inputs?.video_files,
+        video_count: event.inputs?.video_files?.length
+      })
+    }
+  }, [event])
   
   // Fetch available modules
   const { data: modulesData, refetch: refetchModules } = useQuery({
@@ -50,10 +63,18 @@ export default function EventDetail() {
   
   const attachMutation = useMutation({
     mutationFn: (path) => attachVideo(eventId, path),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['event', eventId])
+    onSuccess: async (data) => {
+      console.log('Video attached successfully:', data)
+      // Force refetch to update the UI immediately
+      await queryClient.refetchQueries({ queryKey: ['event', eventId], exact: true })
       setShowUploadModal(false)
       setVideoPath('')
+      setUploadSuccess(true)
+      // Hide success message after 3 seconds
+      setTimeout(() => setUploadSuccess(false), 3000)
+    },
+    onError: (error) => {
+      console.error('Failed to attach video:', error)
     }
   })
   
@@ -174,6 +195,14 @@ export default function EventDetail() {
       
       {/* Overall Status Banner */}
       <StatusBanner status={overallStatus} hasVideo={hasVideo} />
+      
+      {/* Success message */}
+      {uploadSuccess && (
+        <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center gap-2">
+          <CheckCircle size={20} />
+          <span>Video attached successfully!</span>
+        </div>
+      )}
       
       {/* Real-time Workflow Progress */}
       {(progress || isPolling) && viewMode === 'workflow' && (

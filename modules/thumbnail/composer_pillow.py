@@ -45,6 +45,11 @@ class ThumbnailComposer:
         meeting_font_path: Optional[str] = None,
         logo_size: dict = None,
         pastor_size: dict = None,
+        logo_position: dict = None,
+        pastor_position: dict = None,
+        title_position: dict = None,
+        subtitle_position: dict = None,
+        meeting_position: dict = None,
         size: Tuple[int, int] = DEFAULT_SIZE
     ) -> tuple[bool, Optional[str]]:
         """
@@ -78,7 +83,20 @@ class ThumbnailComposer:
             if logo_size is None:
                 logo_size = {'width': 200, 'height': 200}
             if pastor_size is None:
-                pastor_size = {'width': 250, 'height': 250}
+                pastor_size = {'width': 400, 'height': 400}
+            
+            # Set default positions if not provided
+            # Format: {'align': 'top-left'|'top-right'|'bottom-left'|'bottom-right'|'center'|'custom', 'x': int, 'y': int, 'padding': int}
+            if logo_position is None:
+                logo_position = {'align': 'top-left', 'padding': 30}
+            if pastor_position is None:
+                pastor_position = {'align': 'bottom-left', 'padding': 30}
+            if title_position is None:
+                title_position = {'align': 'center', 'y_offset': -40}
+            if subtitle_position is None:
+                subtitle_position = {'align': 'center', 'y_offset': 40}
+            if meeting_position is None:
+                meeting_position = {'align': 'top-right', 'padding': 40}
             
             # Create base canvas
             canvas = Image.new('RGB', size, color=(255, 255, 255))
@@ -101,9 +119,10 @@ class ThumbnailComposer:
                     max_height=logo_size.get('height', 200)
                 )
                 
-                # Position in top-left corner with padding
-                logo_x = 30
-                logo_y = 30
+                # Calculate position based on configuration
+                logo_x, logo_y = self._calculate_position(
+                    logo_position, logo_img.width, logo_img.height, size
+                )
                 
                 if logo_img.mode == 'RGBA':
                     canvas.paste(logo_img, (logo_x, logo_y), logo_img)
@@ -115,13 +134,14 @@ class ThumbnailComposer:
                 pastor_img = Image.open(pastor_image)
                 pastor_img = self._resize_with_aspect(
                     pastor_img, 
-                    max_width=pastor_size.get('width', 250), 
-                    max_height=pastor_size.get('height', 250)
+                    max_width=pastor_size.get('width', 400), 
+                    max_height=pastor_size.get('height', 400)
                 )
                 
-                # Position in bottom-left corner
-                pastor_x = 30
-                pastor_y = size[1] - pastor_img.height - 30
+                # Calculate position based on configuration
+                pastor_x, pastor_y = self._calculate_position(
+                    pastor_position, pastor_img.width, pastor_img.height, size
+                )
                 
                 if pastor_img.mode == 'RGBA':
                     canvas.paste(pastor_img, (pastor_x, pastor_y), pastor_img)
@@ -136,7 +156,7 @@ class ThumbnailComposer:
             text_right_margin = 50
             text_max_width = size[0] - text_left_margin - text_right_margin
             
-            # Draw meeting type (top-right corner)
+            # Draw meeting type
             if meeting_type:
                 meeting_font = self._load_font_auto_adjust(
                     meeting_type,
@@ -147,8 +167,12 @@ class ThumbnailComposer:
                 
                 meeting_bbox = draw.textbbox((0, 0), meeting_type, font=meeting_font)
                 meeting_width = meeting_bbox[2] - meeting_bbox[0]
-                meeting_x = size[0] - meeting_width - 50
-                meeting_y = 40
+                meeting_height = meeting_bbox[3] - meeting_bbox[1]
+                
+                # Calculate position based on configuration
+                meeting_x, meeting_y = self._calculate_position(
+                    meeting_position, meeting_width, meeting_height, size
+                )
                 
                 self._draw_text_with_stroke(
                     draw,
@@ -160,10 +184,7 @@ class ThumbnailComposer:
                     stroke_width=3
                 )
             
-            # Calculate center text layout
-            center_y_start = size[1] // 2
-            
-            # Draw title (centered)
+            # Draw title
             if title:
                 title_font = self._load_font_auto_adjust(
                     title,
@@ -178,28 +199,12 @@ class ThumbnailComposer:
                 title_width = title_bbox[2] - title_bbox[0]
                 title_height = title_bbox[3] - title_bbox[1]
                 
-                # Calculate total height for vertical centering
-                total_height = title_height
-                if subtitle:
-                    # Estimate subtitle height
-                    subtitle_font = self._load_font_auto_adjust(
-                        subtitle,
-                        subtitle_font_size,
-                        text_max_width - 100,
-                        font_path=subtitle_font_path
-                    )
-                    wrapped_subtitle = self._wrap_text(subtitle, subtitle_font, text_max_width - 100)
-                    subtitle_bbox = draw.multiline_textbbox((0, 0), wrapped_subtitle, font=subtitle_font)
-                    subtitle_height = subtitle_bbox[3] - subtitle_bbox[1]
-                    total_height += subtitle_height + 40
-                
-                # Center vertically
-                start_y = (size[1] - total_height) // 2
-                title_x = (size[0] - title_width) // 2
+                # Calculate position using configurable settings
+                title_x, title_y = self._calculate_position(title_position, title_width, title_height, size)
                 
                 self._draw_text_with_stroke(
                     draw,
-                    (title_x, start_y),
+                    (title_x, title_y),
                     wrapped_title,
                     title_font,
                     fill_color=(255, 255, 255),
@@ -210,11 +215,19 @@ class ThumbnailComposer:
                 
                 # Draw subtitle
                 if subtitle:
+                    subtitle_font = self._load_font_auto_adjust(
+                        subtitle,
+                        subtitle_font_size,
+                        text_max_width - 100,
+                        font_path=subtitle_font_path
+                    )
                     wrapped_subtitle = self._wrap_text(subtitle, subtitle_font, text_max_width - 100)
                     subtitle_bbox = draw.multiline_textbbox((0, 0), wrapped_subtitle, font=subtitle_font)
                     subtitle_width = subtitle_bbox[2] - subtitle_bbox[0]
-                    subtitle_x = (size[0] - subtitle_width) // 2
-                    subtitle_y = start_y + title_height + 40
+                    subtitle_height = subtitle_bbox[3] - subtitle_bbox[1]
+                    
+                    # Calculate position using configurable settings
+                    subtitle_x, subtitle_y = self._calculate_position(subtitle_position, subtitle_width, subtitle_height, size)
                     
                     self._draw_text_with_stroke(
                         draw,
@@ -236,6 +249,70 @@ class ThumbnailComposer:
         except Exception as e:
             self.logger.error(f"Failed to compose thumbnail: {e}")
             return False, str(e)
+    
+    def _calculate_position(
+        self, 
+        position_config: dict, 
+        element_width: int, 
+        element_height: int, 
+        canvas_size: Tuple[int, int]
+    ) -> Tuple[int, int]:
+        """
+        Calculate element position based on configuration
+        
+        Args:
+            position_config: Position configuration dict
+                - align: 'top-left', 'top-right', 'bottom-left', 'bottom-right', 'center', 'custom'
+                - x: custom x coordinate (for 'custom' align)
+                - y: custom y coordinate (for 'custom' align)
+                - padding: padding from edges (default: 30)
+                - y_offset: vertical offset from calculated position (default: 0)
+            element_width: Width of the element
+            element_height: Height of the element
+            canvas_size: (width, height) of canvas
+            
+        Returns:
+            (x, y) coordinates
+        """
+        align = position_config.get('align', 'top-left')
+        padding = position_config.get('padding', 30)
+        y_offset = position_config.get('y_offset', 0)
+        
+        canvas_width, canvas_height = canvas_size
+        
+        if align == 'custom':
+            x = position_config.get('x', padding)
+            y = position_config.get('y', padding)
+        elif align == 'top-left':
+            x = padding
+            y = padding
+        elif align == 'top-right':
+            x = canvas_width - element_width - padding
+            y = padding
+        elif align == 'bottom-left':
+            x = padding
+            y = canvas_height - element_height - padding
+        elif align == 'bottom-right':
+            x = canvas_width - element_width - padding
+            y = canvas_height - element_height - padding
+        elif align == 'center':
+            x = (canvas_width - element_width) // 2
+            y = (canvas_height - element_height) // 2
+        elif align == 'top-center':
+            x = (canvas_width - element_width) // 2
+            y = padding
+        elif align == 'bottom-center':
+            x = (canvas_width - element_width) // 2
+            y = canvas_height - element_height - padding
+        else:
+            # Default to top-left
+            x = padding
+            y = padding
+        
+        # Apply y_offset
+        y += y_offset
+        
+        return x, y
     
     def _resize_with_aspect(
         self, 

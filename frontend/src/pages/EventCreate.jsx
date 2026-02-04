@@ -110,7 +110,12 @@ export default function EventCreate() {
     pastor_path: defaults.default_pastor,
     background_path: null,
     logo_size: defaults.default_logo_size,
-    pastor_size: defaults.default_pastor_size
+    pastor_size: defaults.default_pastor_size,
+    logo_position: defaults.default_logo_position || { align: 'top-left', padding: 30 },
+    pastor_position: defaults.default_pastor_position || { align: 'bottom-left', padding: 30 },
+    title_position: defaults.default_title_position || { align: 'center', padding: 50, y_offset: -50 },
+    subtitle_position: defaults.default_subtitle_position || { align: 'center', padding: 50, y_offset: 50 },
+    meeting_position: defaults.default_meeting_position || { align: 'top-right', padding: 50 }
   })
   
   // Fetch available models
@@ -928,6 +933,123 @@ export default function EventCreate() {
                             min="50"
                             max="800"
                             className="px-2 py-1.5 border border-gray-300 rounded text-xs text-center"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Position Controls */}
+                  <div className="space-y-2 border-t pt-3 mt-3">
+                    <h4 className="text-xs font-medium text-gray-700">元素位置设置</h4>
+                    <p className="text-xs text-gray-500 mb-2">简化版：仅显示对齐方式和边距</p>
+                    
+                    {/* Logo Position */}
+                    {thumbSettings.elements.logo && (
+                      <div className="p-2 bg-gray-50 rounded">
+                        <label className="block text-xs font-medium mb-1">Logo 位置</label>
+                        <select
+                          value={thumbSettings.logo_position?.align || 'top-left'}
+                          onChange={(e) => setThumbSettings(prev => ({
+                            ...prev,
+                            logo_position: { ...prev.logo_position, align: e.target.value }
+                          }))}
+                          className="w-full px-2 py-1 border rounded text-xs mb-1"
+                        >
+                          <option value="top-left">左上角</option>
+                          <option value="top-center">顶部居中</option>
+                          <option value="top-right">右上角</option>
+                          <option value="center">居中</option>
+                          <option value="bottom-left">左下角</option>
+                          <option value="bottom-center">底部居中</option>
+                          <option value="bottom-right">右下角</option>
+                        </select>
+                        <input
+                          type="number"
+                          value={thumbSettings.logo_position?.padding || 30}
+                          onChange={(e) => setThumbSettings(prev => ({
+                            ...prev,
+                            logo_position: { ...prev.logo_position, padding: parseInt(e.target.value) || 30 }
+                          }))}
+                          placeholder="边距"
+                          className="w-full px-2 py-1 border rounded text-xs"
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Pastor Position */}
+                    {thumbSettings.elements.pastor && (
+                      <div className="p-2 bg-gray-50 rounded">
+                        <label className="block text-xs font-medium mb-1">Pastor 位置</label>
+                        <select
+                          value={thumbSettings.pastor_position?.align || 'bottom-left'}
+                          onChange={(e) => setThumbSettings(prev => ({
+                            ...prev,
+                            pastor_position: { ...prev.pastor_position, align: e.target.value }
+                          }))}
+                          className="w-full px-2 py-1 border rounded text-xs mb-1"
+                        >
+                          <option value="top-left">左上角</option>
+                          <option value="top-center">顶部居中</option>
+                          <option value="top-right">右上角</option>
+                          <option value="center">居中</option>
+                          <option value="bottom-left">左下角</option>
+                          <option value="bottom-center">底部居中</option>
+                          <option value="bottom-right">右下角</option>
+                        </select>
+                        <input
+                          type="number"
+                          value={thumbSettings.pastor_position?.padding || 30}
+                          onChange={(e) => setThumbSettings(prev => ({
+                            ...prev,
+                            pastor_position: { ...prev.pastor_position, padding: parseInt(e.target.value) || 30 }
+                          }))}
+                          placeholder="边距"
+                          className="w-full px-2 py-1 border rounded text-xs"
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Title Position */}
+                    {thumbSettings.elements.title && (
+                      <div className="p-2 bg-gray-50 rounded">
+                        <label className="block text-xs font-medium mb-1">标题位置</label>
+                        <select
+                          value={thumbSettings.title_position?.align || 'center'}
+                          onChange={(e) => setThumbSettings(prev => ({
+                            ...prev,
+                            title_position: { ...prev.title_position, align: e.target.value }
+                          }))}
+                          className="w-full px-2 py-1 border rounded text-xs mb-1"
+                        >
+                          <option value="top-left">左上角</option>
+                          <option value="top-center">顶部居中</option>
+                          <option value="top-right">右上角</option>
+                          <option value="center">居中</option>
+                          <option value="bottom-left">左下角</option>
+                          <option value="bottom-center">底部居中</option>
+                          <option value="bottom-right">右下角</option>
+                        </select>
+                        <div className="grid grid-cols-2 gap-1">
+                          <input
+                            type="number"
+                            value={thumbSettings.title_position?.padding || 50}
+                            onChange={(e) => setThumbSettings(prev => ({
+                              ...prev,
+                              title_position: { ...prev.title_position, padding: parseInt(e.target.value) || 50 }
+                            }))}
+                            placeholder="边距"
+                            className="px-2 py-1 border rounded text-xs"
+                          />
+                          <input
+                            type="number"
+                            value={thumbSettings.title_position?.y_offset || -50}
+                            onChange={(e) => setThumbSettings(prev => ({
+                              ...prev,
+                              title_position: { ...prev.title_position, y_offset: parseInt(e.target.value) || 0 }
+                            }))}
+                            placeholder="Y偏移"
+                            className="px-2 py-1 border rounded text-xs"
                           />
                         </div>
                       </div>

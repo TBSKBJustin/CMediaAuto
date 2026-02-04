@@ -24,6 +24,11 @@ export default function Settings() {
     default_pastor: '',
     default_logo_size: { width: 200, height: 200 },
     default_pastor_size: { width: 250, height: 250 },
+    default_logo_position: { align: 'top-left', padding: 30 },
+    default_pastor_position: { align: 'bottom-left', padding: 30 },
+    default_title_position: { align: 'center', padding: 50, y_offset: -50 },
+    default_subtitle_position: { align: 'center', padding: 50, y_offset: 50 },
+    default_meeting_position: { align: 'top-right', padding: 50 },
   })
 
   const [saved, setSaved] = useState(false)
@@ -649,6 +654,348 @@ export default function Settings() {
             <p className="text-xs text-gray-500 mt-1">
               Pastor 图片最大尺寸（默认: 250×250）
             </p>
+          </div>
+        </div>
+
+        {/* Position Settings */}
+        <div className="space-y-3 pt-3 border-t">
+          <h4 className="text-sm font-medium text-gray-700">元素位置设置</h4>
+          <p className="text-xs text-gray-600 mb-2">
+            配置各元素在缩略图中的位置
+          </p>
+          
+          {/* Logo Position */}
+          <div className="p-3 bg-gray-50 rounded border">
+            <label className="block text-xs font-medium text-gray-700 mb-2">
+              Logo 位置
+            </label>
+            <div className="space-y-2">
+              <select
+                value={settings.default_logo_position?.align || 'top-left'}
+                onChange={(e) => handleChange('default_logo_position', {
+                  ...settings.default_logo_position,
+                  align: e.target.value
+                })}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="top-left">左上角</option>
+                <option value="top-center">顶部居中</option>
+                <option value="top-right">右上角</option>
+                <option value="center">居中</option>
+                <option value="bottom-left">左下角</option>
+                <option value="bottom-center">底部居中</option>
+                <option value="bottom-right">右下角</option>
+                <option value="custom">自定义坐标</option>
+              </select>
+              
+              {settings.default_logo_position?.align === 'custom' ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    value={settings.default_logo_position?.x || 0}
+                    onChange={(e) => handleChange('default_logo_position', {
+                      ...settings.default_logo_position,
+                      x: parseInt(e.target.value) || 0
+                    })}
+                    placeholder="X 坐标"
+                    className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  />
+                  <input
+                    type="number"
+                    value={settings.default_logo_position?.y || 0}
+                    onChange={(e) => handleChange('default_logo_position', {
+                      ...settings.default_logo_position,
+                      y: parseInt(e.target.value) || 0
+                    })}
+                    placeholder="Y 坐标"
+                    className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  />
+                </div>
+              ) : (
+                <input
+                  type="number"
+                  value={settings.default_logo_position?.padding || 30}
+                  onChange={(e) => handleChange('default_logo_position', {
+                    ...settings.default_logo_position,
+                    padding: parseInt(e.target.value) || 30
+                  })}
+                  placeholder="边距 (padding)"
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Pastor Position */}
+          <div className="p-3 bg-gray-50 rounded border">
+            <label className="block text-xs font-medium text-gray-700 mb-2">
+              Pastor 图片位置
+            </label>
+            <div className="space-y-2">
+              <select
+                value={settings.default_pastor_position?.align || 'bottom-left'}
+                onChange={(e) => handleChange('default_pastor_position', {
+                  ...settings.default_pastor_position,
+                  align: e.target.value
+                })}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="top-left">左上角</option>
+                <option value="top-center">顶部居中</option>
+                <option value="top-right">右上角</option>
+                <option value="center">居中</option>
+                <option value="bottom-left">左下角</option>
+                <option value="bottom-center">底部居中</option>
+                <option value="bottom-right">右下角</option>
+                <option value="custom">自定义坐标</option>
+              </select>
+              
+              {settings.default_pastor_position?.align === 'custom' ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    value={settings.default_pastor_position?.x || 0}
+                    onChange={(e) => handleChange('default_pastor_position', {
+                      ...settings.default_pastor_position,
+                      x: parseInt(e.target.value) || 0
+                    })}
+                    placeholder="X 坐标"
+                    className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  />
+                  <input
+                    type="number"
+                    value={settings.default_pastor_position?.y || 0}
+                    onChange={(e) => handleChange('default_pastor_position', {
+                      ...settings.default_pastor_position,
+                      y: parseInt(e.target.value) || 0
+                    })}
+                    placeholder="Y 坐标"
+                    className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  />
+                </div>
+              ) : (
+                <input
+                  type="number"
+                  value={settings.default_pastor_position?.padding || 30}
+                  onChange={(e) => handleChange('default_pastor_position', {
+                    ...settings.default_pastor_position,
+                    padding: parseInt(e.target.value) || 30
+                  })}
+                  placeholder="边距 (padding)"
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Title Position */}
+          <div className="p-3 bg-gray-50 rounded border">
+            <label className="block text-xs font-medium text-gray-700 mb-2">
+              标题位置
+            </label>
+            <div className="space-y-2">
+              <select
+                value={settings.default_title_position?.align || 'center'}
+                onChange={(e) => handleChange('default_title_position', {
+                  ...settings.default_title_position,
+                  align: e.target.value
+                })}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="top-left">左上角</option>
+                <option value="top-center">顶部居中</option>
+                <option value="top-right">右上角</option>
+                <option value="center">居中</option>
+                <option value="bottom-left">左下角</option>
+                <option value="bottom-center">底部居中</option>
+                <option value="bottom-right">右下角</option>
+                <option value="custom">自定义坐标</option>
+              </select>
+              
+              {settings.default_title_position?.align === 'custom' ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    value={settings.default_title_position?.x || 0}
+                    onChange={(e) => handleChange('default_title_position', {
+                      ...settings.default_title_position,
+                      x: parseInt(e.target.value) || 0
+                    })}
+                    placeholder="X 坐标"
+                    className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  />
+                  <input
+                    type="number"
+                    value={settings.default_title_position?.y || 0}
+                    onChange={(e) => handleChange('default_title_position', {
+                      ...settings.default_title_position,
+                      y: parseInt(e.target.value) || 0
+                    })}
+                    placeholder="Y 坐标"
+                    className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  />
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="number"
+                    value={settings.default_title_position?.padding || 50}
+                    onChange={(e) => handleChange('default_title_position', {
+                      ...settings.default_title_position,
+                      padding: parseInt(e.target.value) || 50
+                    })}
+                    placeholder="边距 (padding)"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  />
+                  <input
+                    type="number"
+                    value={settings.default_title_position?.y_offset || -50}
+                    onChange={(e) => handleChange('default_title_position', {
+                      ...settings.default_title_position,
+                      y_offset: parseInt(e.target.value) || 0
+                    })}
+                    placeholder="垂直偏移 (y_offset)"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  />
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Subtitle Position */}
+          <div className="p-3 bg-gray-50 rounded border">
+            <label className="block text-xs font-medium text-gray-700 mb-2">
+              副标题位置
+            </label>
+            <div className="space-y-2">
+              <select
+                value={settings.default_subtitle_position?.align || 'center'}
+                onChange={(e) => handleChange('default_subtitle_position', {
+                  ...settings.default_subtitle_position,
+                  align: e.target.value
+                })}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="top-left">左上角</option>
+                <option value="top-center">顶部居中</option>
+                <option value="top-right">右上角</option>
+                <option value="center">居中</option>
+                <option value="bottom-left">左下角</option>
+                <option value="bottom-center">底部居中</option>
+                <option value="bottom-right">右下角</option>
+                <option value="custom">自定义坐标</option>
+              </select>
+              
+              {settings.default_subtitle_position?.align === 'custom' ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    value={settings.default_subtitle_position?.x || 0}
+                    onChange={(e) => handleChange('default_subtitle_position', {
+                      ...settings.default_subtitle_position,
+                      x: parseInt(e.target.value) || 0
+                    })}
+                    placeholder="X 坐标"
+                    className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  />
+                  <input
+                    type="number"
+                    value={settings.default_subtitle_position?.y || 0}
+                    onChange={(e) => handleChange('default_subtitle_position', {
+                      ...settings.default_subtitle_position,
+                      y: parseInt(e.target.value) || 0
+                    })}
+                    placeholder="Y 坐标"
+                    className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  />
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="number"
+                    value={settings.default_subtitle_position?.padding || 50}
+                    onChange={(e) => handleChange('default_subtitle_position', {
+                      ...settings.default_subtitle_position,
+                      padding: parseInt(e.target.value) || 50
+                    })}
+                    placeholder="边距 (padding)"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  />
+                  <input
+                    type="number"
+                    value={settings.default_subtitle_position?.y_offset || 50}
+                    onChange={(e) => handleChange('default_subtitle_position', {
+                      ...settings.default_subtitle_position,
+                      y_offset: parseInt(e.target.value) || 0
+                    })}
+                    placeholder="垂直偏移 (y_offset)"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  />
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Meeting Type Position */}
+          <div className="p-3 bg-gray-50 rounded border">
+            <label className="block text-xs font-medium text-gray-700 mb-2">
+              Meeting Type 位置
+            </label>
+            <div className="space-y-2">
+              <select
+                value={settings.default_meeting_position?.align || 'top-right'}
+                onChange={(e) => handleChange('default_meeting_position', {
+                  ...settings.default_meeting_position,
+                  align: e.target.value
+                })}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="top-left">左上角</option>
+                <option value="top-center">顶部居中</option>
+                <option value="top-right">右上角</option>
+                <option value="center">居中</option>
+                <option value="bottom-left">左下角</option>
+                <option value="bottom-center">底部居中</option>
+                <option value="bottom-right">右下角</option>
+                <option value="custom">自定义坐标</option>
+              </select>
+              
+              {settings.default_meeting_position?.align === 'custom' ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    value={settings.default_meeting_position?.x || 0}
+                    onChange={(e) => handleChange('default_meeting_position', {
+                      ...settings.default_meeting_position,
+                      x: parseInt(e.target.value) || 0
+                    })}
+                    placeholder="X 坐标"
+                    className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  />
+                  <input
+                    type="number"
+                    value={settings.default_meeting_position?.y || 0}
+                    onChange={(e) => handleChange('default_meeting_position', {
+                      ...settings.default_meeting_position,
+                      y: parseInt(e.target.value) || 0
+                    })}
+                    placeholder="Y 坐标"
+                    className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  />
+                </div>
+              ) : (
+                <input
+                  type="number"
+                  value={settings.default_meeting_position?.padding || 50}
+                  onChange={(e) => handleChange('default_meeting_position', {
+                    ...settings.default_meeting_position,
+                    padding: parseInt(e.target.value) || 50
+                  })}
+                  placeholder="边距 (padding)"
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                />
+              )}
+            </div>
           </div>
         </div>
 
