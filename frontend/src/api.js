@@ -71,6 +71,11 @@ export const getOllamaModels = async () => {
   return data
 }
 
+export const getOllamaImageModels = async () => {
+  const { data } = await api.get('/models/ollama-image')
+  return data
+}
+
 // Modules
 export const getEventModules = async (eventId) => {
   const { data } = await api.get(`/events/${eventId}/modules`)

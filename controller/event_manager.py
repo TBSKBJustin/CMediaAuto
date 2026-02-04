@@ -34,9 +34,9 @@ class EventManager:
         ai_summary_length: str = "medium",
         ai_summary_languages: List[str] = None,
         ai_unload_model_after: bool = True,
-        thumbnail_ai_backend: str = "stable-diffusion",
-        thumbnail_ai_url: str = "http://localhost:7860",
-        thumbnail_ai_model: Optional[str] = None,
+        thumbnail_ai_backend: str = "ollama",
+        thumbnail_ai_url: str = "http://localhost:11434",
+        thumbnail_ai_model: Optional[str] = "x/z-image-turbo",
         modules: Optional[Dict[str, bool]] = None
     ) -> str:
         """
@@ -82,17 +82,20 @@ class EventManager:
         event_id = f"{date}_{time}_{slug}"
         
         # Default module configuration
+        # Execution order: subtitles → correction → summary → thumbnail_ai → thumbnail_compose
         if modules is None:
             modules = {
-                "live_control": False,
-                "ingest_obs_monitor": True,
+                "subtitles": True,
+                "subtitle_correction": True,
+                "content_summary": True,
                 "thumbnail_ai": True,
                 "thumbnail_compose": True,
-                "subtitles": True,
-                "ai_content": True,
-                "publish_youtube": True,
-                "publish_website": True,
-                "archive": False
+                "ai_content": False,  # Legacy combined module (disabled by default)
+                "publish_youtube": False,
+                "publish_website": False,
+                "archive": False,
+                "live_control": False,
+                "ingest_obs_monitor": True
             }
         
         # Event configuration

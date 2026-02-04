@@ -107,9 +107,37 @@ class WorkflowController:
         return results
     
     def _get_enabled_modules(self, event_config: Dict) -> List[str]:
-        """Extract enabled modules from event configuration"""
+        """Extract enabled modules from event configuration in correct execution order"""
         modules_config = event_config.get("modules", {})
-        return [name for name, enabled in modules_config.items() if enabled]
+        
+        # Define the correct execution order
+        # subtitles → correction → summary (generates image prompt) → thumbnail_ai → thumbnail_compose
+        module_order = [
+            "subtitles",
+            "subtitle_correction",
+            "content_summary",
+            "thumbnail_ai",
+            "thumbnail_compose",
+            "ai_content",  # Legacy combined module
+            "publish_youtube",
+            "publish_website",
+            "archive",
+            "live_control",
+            "ingest_obs_monitor"
+        ]
+        
+        # Return only enabled modules in the correct order
+        enabled_modules = []
+        for module_name in module_order:
+            if modules_config.get(module_name, False):
+                enabled_modules.append(module_name)
+        
+        # Include any other enabled modules not in the predefined order (for extensibility)
+        for module_name, enabled in modules_config.items():
+            if enabled and module_name not in enabled_modules:
+                enabled_modules.append(module_name)
+        
+        return enabled_modules
     
     def _run_module(self, event_id: str, module_name: str, event_config: Dict, force: bool) -> Dict:
         """
@@ -314,12 +342,11 @@ class WorkflowController:
             
             # Setup directories
             event_dir = Path("events") / event_id
-            logs_dir = event_dir / "logs"
             output_dir = event_dir / "output"
             output_dir.mkdir(parents=True, exist_ok=True)
             
-            # Read image prompt from summary output
-            image_prompt_files = list(logs_dir.glob("*_image_prompt.txt"))
+            # Read image prompt from summary output (in output dir, not logs)
+            image_prompt_files = list(output_dir.glob("*_image_prompt.txt"))
             
             if not image_prompt_files:
                 self.logger.warning("No image prompt found, skipping AI generation")
@@ -340,6 +367,12 @@ class WorkflowController:
             backend = event_config.get("thumbnail_ai_backend", "stable-diffusion")
             base_url = event_config.get("thumbnail_ai_url", "http://localhost:7860")
             model = event_config.get("thumbnail_ai_model", None)
+            
+            # Get AI settings for model unloading
+            ai_settings = event_config.get("ai_content_settings", {})
+            unload_model_after = ai_settings.get("unload_model_after", True)
+            
+            self.logger.info(f"AI generation settings: backend={backend}, model={model}, unload_after={unload_model_after}")
             
             # Initialize generator
             generator = ImageGenerator(
@@ -369,6 +402,11 @@ class WorkflowController:
                 fallback_asset=fallback
             )
             
+            # Unload model if requested (for Ollama backend)
+            if success and unload_model_after and backend == "ollama":
+                self.logger.info(f"Unloading image model from memory...")
+                generator.unload_model()
+            
             if success:
                 self.logger.info(f"AI background generated: {bg_image_path}")
                 return {
@@ -377,6 +415,7 @@ class WorkflowController:
                     "output_file": str(bg_image_path),
                     "prompt": prompt,
                     "backend": backend,
+                    "model": model,
                     "timestamp": self._get_timestamp()
                 }
             else:

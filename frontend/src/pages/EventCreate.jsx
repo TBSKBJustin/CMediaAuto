@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { createEvent, getWhisperModels, getOllamaModels } from '../api'
+import { createEvent, getWhisperModels, getOllamaModels, getOllamaImageModels } from '../api'
 
 export default function EventCreate() {
   const navigate = useNavigate()
@@ -26,9 +26,9 @@ export default function EventCreate() {
       subtitle_split_on_word: true,
       ai_model: 'qwen2.5:latest',
       ai_unload_model_after: true,
-      thumbnail_ai_backend: 'stable-diffusion',
-      thumbnail_ai_url: 'http://localhost:7860',
-      thumbnail_ai_model: '',
+      thumbnail_ai_backend: 'ollama',
+      thumbnail_ai_url: 'http://localhost:11434',
+      thumbnail_ai_model: 'x/z-image-turbo',
     }
   }
   
@@ -53,11 +53,12 @@ export default function EventCreate() {
     thumbnail_ai_url: defaults.thumbnail_ai_url,
     thumbnail_ai_model: defaults.thumbnail_ai_model,
     modules: {
-      thumbnail_ai: true,
-      thumbnail_compose: true,
       subtitles: true,
       subtitle_correction: true,
       content_summary: true,
+      thumbnail_ai: true,
+      thumbnail_compose: true,
+      ai_content: false,  // Legacy combined module
       publish_youtube: false,
       publish_website: false,
     }
@@ -74,6 +75,11 @@ export default function EventCreate() {
     queryFn: getOllamaModels
   })
   
+  const { data: ollamaImageModelsData } = useQuery({
+    queryKey: ['ollamaImageModels'],
+    queryFn: getOllamaImageModels
+  })
+  
   // Set default models when data loads
   useEffect(() => {
     if (whisperModelsData?.default && !formData.whisper_model) {
@@ -86,6 +92,12 @@ export default function EventCreate() {
       setFormData(prev => ({ ...prev, ai_model: ollamaModelsData.default }))
     }
   }, [ollamaModelsData])
+  
+  useEffect(() => {
+    if (ollamaImageModelsData?.default && formData.thumbnail_ai_model === 'x/z-image-turbo') {
+      setFormData(prev => ({ ...prev, thumbnail_ai_model: ollamaImageModelsData.default }))
+    }
+  }, [ollamaImageModelsData])
   
   const createMutation = useMutation({
     mutationFn: createEvent,
@@ -445,51 +457,112 @@ export default function EventCreate() {
           </div>
         </div>
         
+        {/* Thumbnail AI Settings */}
+        <div className="bg-white rounded-lg shadow p-6 space-y-4">
+          <h3 className="text-lg font-semibold">Thumbnail AI Settings</h3>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Image Generation Backend
+            </label>
+            <select
+              value={formData.thumbnail_ai_backend}
+              onChange={(e) => setFormData(prev => ({ ...prev, thumbnail_ai_backend: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="ollama">Ollama (Image Models)</option>
+              <option value="stable-diffusion">Stable Diffusion WebUI</option>
+              <option value="fallback">Fallback (Use Asset Images)</option>
+            </select>
+          </div>
+
+          {formData.thumbnail_ai_backend === 'ollama' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Ollama Image Model
+              </label>
+              <select
+                value={formData.thumbnail_ai_model}
+                onChange={(e) => setFormData(prev => ({ ...prev, thumbnail_ai_model: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={!ollamaImageModelsData?.models?.length}
+              >
+                {ollamaImageModelsData?.models?.length > 0 ? (
+                  ollamaImageModelsData.models.map(model => (
+                    <option key={model.value} value={model.value}>
+                      {model.label}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">
+                    {ollamaImageModelsData?.service_available === false 
+                      ? 'Ollama not running'
+                      : 'No image models found'}
+                  </option>
+                )}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                {ollamaImageModelsData?.models?.length > 0
+                  ? `${ollamaImageModelsData.models.length} image model(s) available`
+                  : ollamaImageModelsData?.service_available === false
+                  ? 'Start Ollama with: ollama serve'
+                  : 'Pull an image model: ollama pull x/z-image-turbo'}
+              </p>
+            </div>
+          )}
+        </div>
+        
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold mb-4">Workflow Modules</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Modules will execute in this order: Subtitles → Correction → Summary → Thumbnail AI → Thumbnail Compose
+          </p>
           <div className="space-y-3">
             <ModuleToggle
-              name="thumbnail_ai"
-              label="Generate Thumbnail (AI)"
-              checked={formData.modules.thumbnail_ai}
-              onChange={() => handleModuleToggle('thumbnail_ai')}
-            />
-            <ModuleToggle
-              name="thumbnail_compose"
-              label="Compose Final Thumbnail"
-              checked={formData.modules.thumbnail_compose}
-              onChange={() => handleModuleToggle('thumbnail_compose')}
-            />
-            <ModuleToggle
               name="subtitles"
-              label="Generate Subtitles"
+              label="1. Generate Subtitles"
               checked={formData.modules.subtitles}
               onChange={() => handleModuleToggle('subtitles')}
             />
             <ModuleToggle
               name="subtitle_correction"
-              label="Correct Subtitles (AI)"
+              label="2. Correct Subtitles (AI)"
               checked={formData.modules.subtitle_correction}
               onChange={() => handleModuleToggle('subtitle_correction')}
             />
             <ModuleToggle
               name="content_summary"
-              label="Generate Content Summary (AI)"
+              label="3. Generate Content Summary (AI)"
               checked={formData.modules.content_summary}
               onChange={() => handleModuleToggle('content_summary')}
             />
             <ModuleToggle
-              name="publish_youtube"
-              label="Publish to YouTube"
-              checked={formData.modules.publish_youtube}
-              onChange={() => handleModuleToggle('publish_youtube')}
+              name="thumbnail_ai"
+              label="4. Generate Thumbnail Background (AI)"
+              checked={formData.modules.thumbnail_ai}
+              onChange={() => handleModuleToggle('thumbnail_ai')}
             />
             <ModuleToggle
-              name="publish_website"
-              label="Publish to Website"
-              checked={formData.modules.publish_website}
-              onChange={() => handleModuleToggle('publish_website')}
+              name="thumbnail_compose"
+              label="5. Compose Final Thumbnail"
+              checked={formData.modules.thumbnail_compose}
+              onChange={() => handleModuleToggle('thumbnail_compose')}
             />
+            <div className="border-t pt-3 mt-3">
+              <p className="text-xs text-gray-500 mb-2">Publishing Options:</p>
+              <ModuleToggle
+                name="publish_youtube"
+                label="Publish to YouTube"
+                checked={formData.modules.publish_youtube}
+                onChange={() => handleModuleToggle('publish_youtube')}
+              />
+              <ModuleToggle
+                name="publish_website"
+                label="Publish to Website"
+                checked={formData.modules.publish_website}
+                onChange={() => handleModuleToggle('publish_website')}
+              />
+            </div>
           </div>
         </div>
         

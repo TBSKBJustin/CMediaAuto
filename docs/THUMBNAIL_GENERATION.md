@@ -36,6 +36,7 @@ The **Thumbnail AI** module:
 - Saves to `output/ai_background.png`
 
 **Supported Backends:**
+- **Ollama** (Image generation models like x/z-image-turbo)
 - **Stable Diffusion WebUI** (Automatic1111)
 - **ComfyUI** (Coming soon)
 - **Fallback** (Uses existing assets)
@@ -51,7 +52,36 @@ The **Thumbnail Compose** module:
 
 ## Setup Instructions
 
-### Option 1: Stable Diffusion WebUI (Recommended)
+### Option 1: Ollama (Easiest - Recommended)
+
+1. **Pull an image generation model:**
+   ```bash
+   ollama pull x/z-image-turbo
+   ```
+   
+   Other options:
+   ```bash
+   ollama pull black-forest-labs/flux.1-dev
+   ```
+
+2. **Configure in CMAS:**
+   - Go to Settings page
+   - Set "Image Generation Backend" to "Ollama"
+   - API URL: `http://localhost:11434` (default)
+   - Model: `x/z-image-turbo`
+
+3. **Verify Ollama is running:**
+   ```bash
+   ollama list
+   ```
+
+**Advantages:**
+- ✅ No additional setup (uses existing Ollama)
+- ✅ Fast model switching
+- ✅ Lower resource usage
+- ✅ Same service for text + images
+
+### Option 2: Stable Diffusion WebUI (Best Quality)
 
 1. **Install Stable Diffusion WebUI:**
    ```bash
@@ -76,7 +106,7 @@ The **Thumbnail Compose** module:
    curl http://localhost:7860/sdapi/v1/sd-models
    ```
 
-### Option 2: Fallback Mode (No Setup Required)
+### Option 3: Fallback Mode (No Setup Required)
 
 1. Place background images in `assets/backgrounds/`
 2. Set backend to "Fallback" in Settings
@@ -90,9 +120,9 @@ Configure defaults for all new events:
 
 ```yaml
 Thumbnail AI Settings:
-  backend: "stable-diffusion"           # or "fallback"
-  url: "http://localhost:7860"          # Stable Diffusion API
-  model: ""                             # Optional: specific model name
+  backend: "ollama"                     # "ollama", "stable-diffusion", or "fallback"
+  url: "http://localhost:11434"         # Ollama (11434) or Stable Diffusion (7860)
+  model: "x/z-image-turbo"              # Required for Ollama, optional for SD
 ```
 
 ### Per-Event Settings
@@ -101,9 +131,9 @@ When creating an event, these can be overridden:
 
 ```json
 {
-  "thumbnail_ai_backend": "stable-diffusion",
-  "thumbnail_ai_url": "http://localhost:7860",
-  "thumbnail_ai_model": null
+  "thumbnail_ai_backend": "ollama",
+  "thumbnail_ai_url": "http://localhost:11434",
+  "thumbnail_ai_model": "x/z-image-turbo"
 }
 ```
 
@@ -154,9 +184,9 @@ This will test:
 from modules.thumbnail.ai_generator_ollama import ImageGenerator
 
 generator = ImageGenerator(
-    backend="stable-diffusion",
-    base_url="http://localhost:7860",
-    model=None  # Optional
+    backend="ollama",  # or "stable-diffusion"
+    base_url="http://localhost:11434",  # or 7860 for SD
+    model="x/z-image-turbo"  # Required for Ollama
 )
 
 success, error = generator.generate_image(
@@ -188,6 +218,24 @@ success, error = composer.compose(
 ```
 
 ## Troubleshooting
+
+### "Model name required for Ollama backend"
+
+**Problem:** Ollama backend selected but no model specified
+
+**Solutions:**
+1. Pull an image model: `ollama pull x/z-image-turbo`
+2. Set model name in Settings page
+3. Or switch to Stable Diffusion/Fallback mode
+
+### "Cannot connect to Ollama"
+
+**Problem:** Ollama service not running
+
+**Solutions:**
+1. Start Ollama: `ollama serve`
+2. Check if it's running: `ollama list`
+3. Verify URL is correct (default: http://localhost:11434)
 
 ### "Cannot connect to Stable Diffusion API"
 

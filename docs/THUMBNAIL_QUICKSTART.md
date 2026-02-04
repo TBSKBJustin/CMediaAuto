@@ -10,7 +10,29 @@
 
 ### Step 1: Choose Your Backend (Pick One)
 
-#### Option A: AI-Powered (Best Quality)
+#### Option A: Ollama (Easiest - No Extra Setup!)
+
+If you already have Ollama running for text generation:
+
+```bash
+# Pull an image generation model
+ollama pull x/z-image-turbo
+```
+
+Configure CMAS:
+- Go to **Settings** → **Thumbnail AI Settings**
+- Backend: `Ollama (Image Models)`
+- URL: `http://localhost:11434`
+- Model: `x/z-image-turbo`
+- Click **Save Settings**
+
+**Why this is great:**
+- ✅ Uses your existing Ollama setup
+- ✅ No additional software needed
+- ✅ Fast and lightweight
+- ✅ Same API for text + images
+
+#### Option B: Stable Diffusion (Best Quality)
 
 Install Stable Diffusion WebUI:
 ```bash
@@ -25,7 +47,7 @@ Wait for it to start, then configure CMAS:
 - URL: `http://localhost:7860`
 - Click **Save Settings**
 
-#### Option B: Use Existing Images (Fastest)
+#### Option C: Use Existing Images (Fastest)
 
 ```bash
 # Place some background images
@@ -84,15 +106,17 @@ Restart CMAS backend to apply.
 ## Example Workflow
 
 ```
-1. Upload sermon video → Process subtitles → Generate summary
+1. Generate Subtitles (Whisper) → SRT/VTT/TXT files created
    ↓
-2. Summary automatically generates image prompt
+2. Correct Subtitles (AI) → Clean up transcription errors
    ↓
-3. Run "Thumbnail AI" → AI creates background (or uses fallback)
+3. Generate Summary (AI) → Content summary + image prompt automatically generated
    ↓
-4. Run "Thumbnail Compose" → Final thumbnail with title overlay
+4. Thumbnail AI → AI creates background using the image prompt
    ↓
-5. Output: thumbnail.jpg ready for YouTube/website!
+5. Thumbnail Compose → Final thumbnail with title overlay
+   ↓
+6. Output: thumbnail.jpg ready for YouTube/website!
 ```
 
 ## Test It Out
@@ -109,12 +133,20 @@ open test_output/test_thumbnail.jpg
 
 ## Troubleshooting
 
+**"Model name required for Ollama backend"**  
+→ Run: `ollama pull x/z-image-turbo`  
+→ Set model name in Settings
+
 **"No image prompt found"**  
 → Run Content Summary module first
 
+**"Cannot connect to Ollama"**  
+→ Make sure Ollama is running: `ollama serve`  
+→ Check with: `ollama list`
+
 **"Cannot connect to Stable Diffusion API"**  
 → Make sure SD WebUI is running with `--api` flag  
-→ Or switch to Fallback mode
+→ Or switch to Ollama/Fallback mode
 
 **Chinese text looks broken**  
 → Install Chinese fonts in `assets/fonts/`

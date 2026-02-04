@@ -53,9 +53,9 @@ class EventCreate(BaseModel):
     ai_summary_length: str = "medium"
     ai_summary_languages: List[str] = ["en"]
     ai_unload_model_after: bool = True
-    thumbnail_ai_backend: str = "stable-diffusion"  # "stable-diffusion", "comfyui", "fallback"
-    thumbnail_ai_url: str = "http://localhost:7860"
-    thumbnail_ai_model: Optional[str] = None
+    thumbnail_ai_backend: str = "ollama"  # "ollama", "stable-diffusion", "comfyui", "fallback"
+    thumbnail_ai_url: str = "http://localhost:11434"
+    thumbnail_ai_model: Optional[str] = "x/z-image-turbo"
     modules: Optional[Dict[str, Any]] = None
 
 
@@ -525,6 +525,65 @@ async def get_ollama_models():
                 'models': models_list,
                 'default': default,
                 'service_available': True
+            }
+        else:
+            return {
+                'models': [],
+                'default': None,
+                'service_available': False,
+                'error': f'Ollama API returned status {response.status_code}'
+            }
+    except Exception as e:
+        return {
+            'models': [],
+            'default': None,
+            'service_available': False,
+            'error': str(e)
+        }
+
+
+@app.get('/api/models/ollama-image')
+async def get_ollama_image_models():
+    """Get available Ollama image generation models"""
+    try:
+        import requests
+        
+        response = requests.get('http://localhost:11434/api/tags', timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            all_models = data.get('models', [])
+            
+            # Filter for image generation models
+            image_keywords = ['image', 'flux', 'stable-diffusion', 'sd', 'turbo', 'dall', 'midjourney']
+            image_models = []
+            
+            for model in all_models:
+                model_name = model.get('name', '').lower()
+                # Check if model name contains image-related keywords
+                if any(keyword in model_name for keyword in image_keywords):
+                    image_models.append({
+                        'value': model.get('name', ''),
+                        'label': model.get('name', ''),
+                        'size': model.get('size', 0),
+                        'modified': model.get('modified_at', '')
+                    })
+            
+            # Determine default (prefer x/z-image-turbo, then flux)
+            default = None
+            for preferred in ['x/z-image-turbo:latest', 'x/z-image-turbo', 'black-forest-labs/flux.1-dev']:
+                if any(m['value'] == preferred for m in image_models):
+                    default = preferred
+                    break
+            
+            if not default and image_models:
+                default = image_models[0]['value']
+            
+            return {
+                'models': image_models,
+                'default': default,
+                'service_available': True,
+                'total_models': len(all_models)
             }
         else:
             return {

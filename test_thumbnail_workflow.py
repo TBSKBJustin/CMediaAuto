@@ -43,6 +43,7 @@ from modules.thumbnail.ai_generator_ollama import ImageGenerator
 
 # Test with different backends
 backends = [
+    ("ollama", "http://localhost:11434", "Requires Ollama with image model (e.g., x/z-image-turbo)"),
     ("fallback", "N/A", "Using fallback images"),
     ("stable-diffusion", "http://localhost:7860", "Requires SD WebUI running"),
 ]
@@ -51,9 +52,13 @@ for backend, url, note in backends:
     print(f"\n🎨 Testing backend: {backend}")
     print(f"   {note}")
     
+    # Set model for Ollama
+    model = "x/z-image-turbo" if backend == "ollama" else None
+    
     generator = ImageGenerator(
         backend=backend,
-        base_url=url
+        base_url=url,
+        model=model
     )
     
     output_dir = Path("test_output")
@@ -142,11 +147,12 @@ print("=" * 60)
 print("""
 Workflow Steps:
 1. ✅ Image prompt generation - AI generates visual description from sermon
-2. 🎨 AI image generation - Stable Diffusion creates background image
+2. 🎨 AI image generation - Ollama/Stable Diffusion creates background image
 3. 🖼️  Thumbnail composition - Pillow overlays title and text
 
 Next Steps:
-- Start Stable Diffusion WebUI with: ./webui.sh --api --listen
+- Pull Ollama image model: ollama pull x/z-image-turbo
+- Or start Stable Diffusion WebUI with: ./webui.sh --api --listen
 - Configure backend in Settings page
 - Run workflow on real sermon event
 

@@ -254,13 +254,18 @@ The controller reads this and only runs enabled modules.
 
 The thumbnail is built from layers:
 
-1. background template (fixed)
+1. AI-generated background (via Ollama image models or Stable Diffusion)
 2. title text + stroke/shadow
 3. scripture reference text
-4. AI-generated character (changes weekly)
-5. pastor portrait (pre-made, fixed)
-6. church logo (fixed)
-7. corner label / badge (fixed)
+4. church logo (fixed)
+5. pastor portrait (pre-made, fixed, optional)
+
+**AI Background Generation:**
+
+The system supports multiple backends for generating sermon thumbnails:
+- **Ollama** (e.g., x/z-image-turbo) - easiest setup, uses existing Ollama service
+- **Stable Diffusion WebUI** - highest quality, requires separate installation
+- **Fallback** - uses pre-made images from assets/backgrounds/
 
 Outputs:
 

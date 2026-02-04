@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getOllamaModels } from '../api'
+import { getOllamaModels, getOllamaImageModels } from '../api'
 
 export default function Settings() {
   const [settings, setSettings] = useState({
@@ -8,9 +8,9 @@ export default function Settings() {
     ai_model: 'qwen2.5:latest',
     subtitle_max_length: 84,
     subtitle_split_on_word: true,
-    thumbnail_ai_backend: 'stable-diffusion',
-    thumbnail_ai_url: 'http://localhost:7860',
-    thumbnail_ai_model: '',
+    thumbnail_ai_backend: 'ollama',
+    thumbnail_ai_url: 'http://localhost:11434',
+    thumbnail_ai_model: 'x/z-image-turbo',
   })
 
   const [saved, setSaved] = useState(false)
@@ -27,6 +27,11 @@ export default function Settings() {
   const { data: ollamaModelsData } = useQuery({
     queryKey: ['ollamaModels'],
     queryFn: getOllamaModels
+  })
+
+  const { data: ollamaImageModelsData } = useQuery({
+    queryKey: ['ollamaImageModels'],
+    queryFn: getOllamaImageModels
   })
 
   const handleSave = () => {
@@ -199,6 +204,7 @@ export default function Settings() {
             onChange={(e) => handleChange('thumbnail_ai_backend', e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
+            <option value="ollama">Ollama (Image Models)</option>
             <option value="stable-diffusion">Stable Diffusion WebUI</option>
             <option value="comfyui">ComfyUI (Coming Soon)</option>
             <option value="fallback">Fallback (Use Asset Images)</option>
@@ -207,6 +213,72 @@ export default function Settings() {
             Choose the image generation service to use
           </p>
         </div>
+
+        {settings.thumbnail_ai_backend === 'ollama' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Ollama API URL
+              </label>
+              <input
+                type="text"
+                value={settings.thumbnail_ai_url}
+                onChange={(e) => handleChange('thumbnail_ai_url', e.target.value)}
+                placeholder="http://localhost:11434"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Default: http://localhost:11434 (Ollama service)
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Image Generation Model
+              </label>
+              <select
+                value={settings.thumbnail_ai_model}
+                onChange={(e) => handleChange('thumbnail_ai_model', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={!ollamaImageModelsData?.models?.length}
+              >
+                {ollamaImageModelsData?.models?.length > 0 ? (
+                  ollamaImageModelsData.models.map(model => (
+                    <option key={model.value} value={model.value}>
+                      {model.label}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">
+                    {ollamaImageModelsData?.service_available === false 
+                      ? 'Ollama not running'
+                      : 'No image models found'}
+                  </option>
+                )}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                {ollamaImageModelsData?.models?.length > 0
+                  ? `${ollamaImageModelsData.models.length} image model(s) available`
+                  : ollamaImageModelsData?.service_available === false
+                  ? 'Start Ollama with: ollama serve'
+                  : 'Pull an image model: ollama pull x/z-image-turbo'}
+              </p>
+            </div>
+
+            <div className="p-3 bg-green-50 rounded-lg">
+              <p className="text-xs text-green-800">
+                <strong>✨ Quick Start:</strong> Pull an image model from Ollama:
+                <br />
+                <code className="bg-green-100 px-1 py-0.5 rounded mt-1 inline-block">
+                  ollama pull x/z-image-turbo
+                </code>
+              </p>
+              <p className="text-xs text-green-700 mt-2">
+                This uses the same Ollama service already running for text generation!
+              </p>
+            </div>
+          </>
+        )}
 
         {settings.thumbnail_ai_backend === 'stable-diffusion' && (
           <>
