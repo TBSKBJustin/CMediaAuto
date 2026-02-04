@@ -365,21 +365,10 @@ class WorkflowController:
             
             # Get AI generation config
             backend = event_config.get("thumbnail_ai_backend", "stable-diffusion")
-            base_url = event_config.get("thumbnail_ai_url", "http://localhost:7860")
-            model = event_config.get("thumbnail_ai_model", None)
             
             # Get AI settings for model unloading
             ai_settings = event_config.get("ai_content_settings", {})
             unload_model_after = ai_settings.get("unload_model_after", True)
-            
-            self.logger.info(f"AI generation settings: backend={backend}, model={model}, unload_after={unload_model_after}")
-            
-            # Initialize generator
-            generator = ImageGenerator(
-                backend=backend,
-                base_url=base_url,
-                model=model
-            )
             
             # Output path
             bg_image_path = output_dir / "ai_background.png"
@@ -393,14 +382,52 @@ class WorkflowController:
                 if bg_files:
                     fallback = str(bg_files[0])
             
-            # Generate image
-            success, error = generator.generate_image(
-                prompt=prompt,
-                output_path=str(bg_image_path),
-                width=1280,
-                height=720,
-                fallback_asset=fallback
-            )
+            # Handle ComfyUI backend separately
+            if backend == "comfyui":
+                from modules.thumbnail.ai_generator_comfyui import ComfyUIGenerator
+                
+                # Get ComfyUI-specific settings
+                server_url = event_config.get("comfyui_server_url", "http://127.0.0.1:8188")
+                width = event_config.get("comfyui_width", 1280)
+                height = event_config.get("comfyui_height", 720)
+                steps = event_config.get("comfyui_steps", 8)
+                
+                self.logger.info(f"AI generation settings: backend=comfyui, server={server_url}, size={width}x{height}, steps={steps}")
+                
+                # Initialize ComfyUI generator
+                generator = ComfyUIGenerator(server_url=server_url)
+                
+                # Generate image (returns tuple: success, error_message)
+                success, error = generator.generate(
+                    prompt=prompt,
+                    output_path=str(bg_image_path),
+                    width=width,
+                    height=height,
+                    steps=steps
+                )
+                    
+            else:
+                # Handle Ollama and other backends
+                base_url = event_config.get("thumbnail_ai_url", "http://localhost:7860")
+                model = event_config.get("thumbnail_ai_model", None)
+                
+                self.logger.info(f"AI generation settings: backend={backend}, model={model}, unload_after={unload_model_after}")
+                
+                # Initialize generator
+                generator = ImageGenerator(
+                    backend=backend,
+                    base_url=base_url,
+                    model=model
+                )
+                
+                # Generate image
+                success, error = generator.generate_image(
+                    prompt=prompt,
+                    output_path=str(bg_image_path),
+                    width=1280,
+                    height=720,
+                    fallback_asset=fallback
+                )
             
             # Unload model if requested (for Ollama backend)
             if success and unload_model_after and backend == "ollama":
@@ -409,15 +436,22 @@ class WorkflowController:
             
             if success:
                 self.logger.info(f"AI background generated: {bg_image_path}")
-                return {
+                result_data = {
                     "status": "success",
                     "message": "AI background image generated",
                     "output_file": str(bg_image_path),
                     "prompt": prompt,
                     "backend": backend,
-                    "model": model,
                     "timestamp": self._get_timestamp()
                 }
+                # Add model info for non-ComfyUI backends
+                if backend != "comfyui":
+                    result_data["model"] = model
+                else:
+                    result_data["server_url"] = event_config.get("comfyui_server_url")
+                    result_data["width"] = event_config.get("comfyui_width")
+                    result_data["height"] = event_config.get("comfyui_height")
+                return result_data
             else:
                 self.logger.error(f"AI generation failed: {error}")
                 return {

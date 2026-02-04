@@ -111,4 +111,36 @@ export const runSingleModule = async (eventId, moduleName, inputFiles = null, fo
   return data
 }
 
+// ComfyUI
+export const checkComfyUIStatus = async (serverUrl) => {
+  const { data } = await api.get('/comfyui/status', {
+    params: { server_url: serverUrl }
+  })
+  return data
+}
+
+export const generateWithComfyUI = async (prompt, width, height, steps, serverUrl) => {
+  const { data } = await api.post('/comfyui/generate', {
+    prompt,
+    width,
+    height,
+    steps,
+    server_url: serverUrl
+  })
+  return data
+}
+
+export const getComfyUIConfig = async () => {
+  const { data } = await api.get('/comfyui/config')
+  return data
+}
+
+export const updateComfyUIConfig = async (serverUrl, workflowTemplate) => {
+  const { data } = await api.put('/comfyui/config', {
+    server_url: serverUrl,
+    workflow_template: workflowTemplate
+  })
+  return data
+}
+
 export default api

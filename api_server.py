@@ -61,6 +61,10 @@ class EventCreate(BaseModel):
     thumbnail_ai_backend: str = "ollama"  # "ollama", "stable-diffusion", "comfyui", "fallback"
     thumbnail_ai_url: str = "http://localhost:11434"
     thumbnail_ai_model: Optional[str] = "x/z-image-turbo"
+    comfyui_server_url: str = "http://127.0.0.1:8188"
+    comfyui_width: int = 1280
+    comfyui_height: int = 720
+    comfyui_steps: int = 9
     thumbnail_settings: Optional[Dict[str, Any]] = None
     modules: Optional[Dict[str, Any]] = None
 
@@ -144,6 +148,10 @@ async def create_event(event_data: EventCreate):
             thumbnail_ai_backend=event_data.thumbnail_ai_backend,
             thumbnail_ai_url=event_data.thumbnail_ai_url,
             thumbnail_ai_model=event_data.thumbnail_ai_model,
+            comfyui_server_url=event_data.comfyui_server_url,
+            comfyui_width=event_data.comfyui_width,
+            comfyui_height=event_data.comfyui_height,
+            comfyui_steps=event_data.comfyui_steps,
             thumbnail_settings=event_data.thumbnail_settings,
             modules=event_data.modules
         )
@@ -714,6 +722,165 @@ async def list_assets(asset_type: str):
         raise HTTPException(status_code=500, detail=f"Failed to list assets: {str(e)}")
 
 
+# ComfyUI Integration Endpoints
+
+class ComfyUIConfig(BaseModel):
+    server_url: str
+    workflow_template: Optional[str] = None
+
+
+class ComfyUIGenerateRequest(BaseModel):
+    prompt: str
+    width: int = 1280
+    height: int = 720
+    steps: int = 9
+    seed: Optional[int] = None
+    server_url: Optional[str] = None
+
+
+@app.get('/api/comfyui/status')
+async def check_comfyui_status(server_url: str = "http://127.0.0.1:8188"):
+    """Check if ComfyUI server is available"""
+    try:
+        from modules.thumbnail.ai_generator_comfyui import ComfyUIGenerator
+        
+        generator = ComfyUIGenerator(server_url=server_url)
+        is_available = generator.check_server()
+        
+        return {
+            'available': is_available,
+            'server_url': server_url,
+            'status': 'online' if is_available else 'offline'
+        }
+    except Exception as e:
+        return {
+            'available': False,
+            'server_url': server_url,
+            'status': 'error',
+            'error': str(e)
+        }
+
+
+@app.post('/api/comfyui/generate')
+async def generate_with_comfyui(request: ComfyUIGenerateRequest):
+    """Generate image using ComfyUI"""
+    try:
+        from modules.thumbnail.ai_generator_comfyui import ComfyUIGenerator
+        import tempfile
+        import time
+        
+        # Use provided server_url or default from config
+        server_url = request.server_url or "http://127.0.0.1:8188"
+        
+        generator = ComfyUIGenerator(server_url=server_url)
+        
+        # Check server first
+        if not generator.check_server():
+            raise HTTPException(
+                status_code=503, 
+                detail=f"ComfyUI server not available at {server_url}"
+            )
+        
+        # Generate temporary output path
+        temp_dir = Path("temp")
+        temp_dir.mkdir(exist_ok=True)
+        output_path = temp_dir / f"comfyui_{int(time.time())}.jpg"
+        
+        # Generate image
+        success, error = generator.generate(
+            prompt=request.prompt,
+            output_path=str(output_path),
+            width=request.width,
+            height=request.height,
+            steps=request.steps,
+            seed=request.seed
+        )
+        
+        if success:
+            return {
+                'success': True,
+                'image_path': str(output_path),
+                'prompt': request.prompt,
+                'width': request.width,
+                'height': request.height
+            }
+        else:
+            raise HTTPException(status_code=500, detail=f"Generation failed: {error}")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"ComfyUI generation error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate image: {str(e)}")
+
+
+@app.get('/api/comfyui/config')
+async def get_comfyui_config():
+    """Get ComfyUI configuration from config.yaml"""
+    try:
+        import yaml
+        
+        config_path = Path("config/config.yaml")
+        if not config_path.exists():
+            raise HTTPException(status_code=404, detail="Configuration file not found")
+        
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        
+        comfyui_config = config.get('modules', {}).get('ai_generator', {}).get('comfyui', {})
+        
+        return {
+            'server_url': comfyui_config.get('server_url', 'http://127.0.0.1:8188'),
+            'workflow_template': comfyui_config.get('workflow_template', 'modules/thumbnail/image_z_image_turbo_API.json'),
+            'default_width': comfyui_config.get('default_width', 1280),
+            'default_height': comfyui_config.get('default_height', 720),
+            'default_steps': comfyui_config.get('default_steps', 9),
+            'timeout': comfyui_config.get('timeout', 120)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load config: {str(e)}")
+
+
+@app.put('/api/comfyui/config')
+async def update_comfyui_config(config: ComfyUIConfig):
+    """Update ComfyUI configuration"""
+    try:
+        import yaml
+        
+        config_path = Path("config/config.yaml")
+        if not config_path.exists():
+            raise HTTPException(status_code=404, detail="Configuration file not found")
+        
+        # Load existing config
+        with open(config_path, 'r') as f:
+            full_config = yaml.safe_load(f)
+        
+        # Update ComfyUI settings
+        if 'modules' not in full_config:
+            full_config['modules'] = {}
+        if 'ai_generator' not in full_config['modules']:
+            full_config['modules']['ai_generator'] = {}
+        if 'comfyui' not in full_config['modules']['ai_generator']:
+            full_config['modules']['ai_generator']['comfyui'] = {}
+        
+        full_config['modules']['ai_generator']['comfyui']['server_url'] = config.server_url
+        if config.workflow_template:
+            full_config['modules']['ai_generator']['comfyui']['workflow_template'] = config.workflow_template
+        
+        # Save config
+        with open(config_path, 'w') as f:
+            yaml.dump(full_config, f, default_flow_style=False, allow_unicode=True)
+        
+        return {
+            'success': True,
+            'message': 'ComfyUI configuration updated',
+            'config': full_config['modules']['ai_generator']['comfyui']
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update config: {str(e)}")
+
+
 if __name__ == '__main__':
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=5001)
+

@@ -273,6 +273,29 @@ export default function EventSettingsModal({ event, onClose }) {
                   />
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">聚会类型字体</label>
+                  <FontSelector
+                    value={settings.thumbnail_settings.meeting_font_path || ''}
+                    onChange={(value) => handleThumbChange('meeting_font_path', value || null)}
+                    fonts={fontsData?.fonts}
+                    placeholder="选择或输入字体"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">聚会类型字号</label>
+                  <input
+                    type="number"
+                    value={settings.thumbnail_settings.meeting_font_size}
+                    onChange={(e) => handleThumbChange('meeting_font_size', parseInt(e.target.value))}
+                    min="24"
+                    max="200"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Image Resources */}
@@ -497,6 +520,84 @@ export default function EventSettingsModal({ event, onClose }) {
                           className="px-2 py-1 border rounded text-xs"
                         />
                       </div>
+                    </div>
+                  )}
+                  
+                  {/* Subtitle Position */}
+                  {settings.thumbnail_settings.elements.subtitle && (
+                    <div className="p-2 bg-gray-50 rounded">
+                      <label className="block text-xs font-medium mb-1">小标题位置</label>
+                      <select
+                        value={settings.thumbnail_settings.subtitle_position?.align || 'center'}
+                        onChange={(e) => handleThumbChange('subtitle_position', {
+                          ...settings.thumbnail_settings.subtitle_position,
+                          align: e.target.value
+                        })}
+                        className="w-full px-2 py-1 border rounded text-xs mb-1"
+                      >
+                        <option value="top-left">左上角</option>
+                        <option value="top-center">顶部居中</option>
+                        <option value="top-right">右上角</option>
+                        <option value="center">居中</option>
+                        <option value="bottom-left">左下角</option>
+                        <option value="bottom-center">底部居中</option>
+                        <option value="bottom-right">右下角</option>
+                      </select>
+                      <div className="grid grid-cols-2 gap-1">
+                        <input
+                          type="number"
+                          value={settings.thumbnail_settings.subtitle_position?.padding || 50}
+                          onChange={(e) => handleThumbChange('subtitle_position', {
+                            ...settings.thumbnail_settings.subtitle_position,
+                            padding: parseInt(e.target.value) || 50
+                          })}
+                          placeholder="边距"
+                          className="px-2 py-1 border rounded text-xs"
+                        />
+                        <input
+                          type="number"
+                          value={settings.thumbnail_settings.subtitle_position?.y_offset || 50}
+                          onChange={(e) => handleThumbChange('subtitle_position', {
+                            ...settings.thumbnail_settings.subtitle_position,
+                            y_offset: parseInt(e.target.value) || 0
+                          })}
+                          placeholder="Y偏移"
+                          className="px-2 py-1 border rounded text-xs"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Meeting Type Position */}
+                  {settings.thumbnail_settings.elements.meeting_type && (
+                    <div className="p-2 bg-gray-50 rounded">
+                      <label className="block text-xs font-medium mb-1">聚会类型位置</label>
+                      <select
+                        value={settings.thumbnail_settings.meeting_position?.align || 'top-right'}
+                        onChange={(e) => handleThumbChange('meeting_position', {
+                          ...settings.thumbnail_settings.meeting_position,
+                          align: e.target.value
+                        })}
+                        className="w-full px-2 py-1 border rounded text-xs mb-1"
+                      >
+                        <option value="top-left">左上角</option>
+                        <option value="top-center">顶部居中</option>
+                        <option value="top-right">右上角</option>
+                        <option value="center">居中</option>
+                        <option value="bottom-left">左下角</option>
+                        <option value="bottom-center">底部居中</option>
+                        <option value="bottom-right">右下角</option>
+                      </select>
+                      <input
+                        type="number"
+                        value={settings.thumbnail_settings.meeting_position?.padding || 50}
+                        onChange={(e) => handleThumbChange('meeting_position', {
+                          ...settings.thumbnail_settings.meeting_position,
+                          padding: parseInt(e.target.value) || 50
+                        })}
+                        placeholder="边距"
+                        className="w-full px-2 py-1 border rounded text-xs"
+                      />
                     </div>
                   )}
                 </div>

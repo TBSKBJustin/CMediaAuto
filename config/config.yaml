@@ -33,6 +33,13 @@ modules:
     ollama:
       base_url: http://localhost:11434
       model: llama2
+    comfyui:
+      server_url: http://127.0.0.1:8188
+      workflow_template: modules/thumbnail/image_z_image_turbo_API.json
+      default_width: 1280
+      default_height: 720
+      default_steps: 9
+      timeout: 120
     fallback_asset: assets/pastor/default-character.png
   subtitles:
     enabled: true

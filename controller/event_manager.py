@@ -37,6 +37,10 @@ class EventManager:
         thumbnail_ai_backend: str = "ollama",
         thumbnail_ai_url: str = "http://localhost:11434",
         thumbnail_ai_model: Optional[str] = "x/z-image-turbo",
+        comfyui_server_url: str = "http://127.0.0.1:8188",
+        comfyui_width: int = 1280,
+        comfyui_height: int = 720,
+        comfyui_steps: int = 9,
         thumbnail_settings: Optional[Dict[str, Any]] = None,
         modules: Optional[Dict[str, bool]] = None
     ) -> str:
@@ -63,6 +67,10 @@ class EventManager:
             thumbnail_ai_backend: Image generation backend (stable-diffusion/comfyui/fallback)
             thumbnail_ai_url: API URL for image generation service
             thumbnail_ai_model: Model name for image generation (optional)
+            comfyui_server_url: ComfyUI server URL
+            comfyui_width: Image width for ComfyUI
+            comfyui_height: Image height for ComfyUI
+            comfyui_steps: Sampling steps for ComfyUI
             thumbnail_settings: Thumbnail composition settings (fonts, sizes, elements, images)
             modules: Module toggle configuration (optional)
             
@@ -120,6 +128,10 @@ class EventManager:
             "thumbnail_ai_backend": thumbnail_ai_backend,
             "thumbnail_ai_url": thumbnail_ai_url,
             "thumbnail_ai_model": thumbnail_ai_model,
+            "comfyui_server_url": comfyui_server_url,
+            "comfyui_width": comfyui_width,
+            "comfyui_height": comfyui_height,
+            "comfyui_steps": comfyui_steps,
             "thumbnail_settings": thumbnail_settings or {},
             "scripture": scripture,
             "speaker": speaker,

@@ -1,7 +1,51 @@
 import React, { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getOllamaModels, getOllamaImageModels, getSystemFonts, getAssets } from '../api'
+import { getOllamaModels, getOllamaImageModels, getSystemFonts, getAssets, checkComfyUIStatus } from '../api'
 import FontSelector from '../components/FontSelector'
+
+// ComfyUI Status Component
+function ComfyUIStatus({ serverUrl }) {
+  const { data: statusData, refetch } = useQuery({
+    queryKey: ['comfyuiStatus', serverUrl],
+    queryFn: () => checkComfyUIStatus(serverUrl),
+    refetchInterval: 10000, // Check every 10 seconds
+    enabled: !!serverUrl
+  })
+
+  const isOnline = statusData?.available === true
+
+  return (
+    <div className={`p-3 rounded-lg border ${
+      isOnline 
+        ? 'bg-green-50 border-green-200' 
+        : 'bg-red-50 border-red-200'
+    }`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${
+            isOnline ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+          }`} />
+          <span className={`text-sm font-medium ${
+            isOnline ? 'text-green-800' : 'text-red-800'
+          }`}>
+            ComfyUI Server: {isOnline ? 'Online' : 'Offline'}
+          </span>
+        </div>
+        <button
+          onClick={() => refetch()}
+          className="text-xs px-2 py-1 bg-white rounded border hover:bg-gray-50"
+        >
+          Refresh
+        </button>
+      </div>
+      {!isOnline && (
+        <p className="text-xs text-red-700 mt-2">
+          Unable to connect to {serverUrl}. Make sure ComfyUI is running.
+        </p>
+      )}
+    </div>
+  )
+}
 
 export default function Settings() {
   const [settings, setSettings] = useState({
@@ -12,6 +56,10 @@ export default function Settings() {
     thumbnail_ai_backend: 'ollama',
     thumbnail_ai_url: 'http://localhost:11434',
     thumbnail_ai_model: 'x/z-image-turbo',
+    comfyui_server_url: 'http://127.0.0.1:8188',
+    comfyui_width: 1280,
+    comfyui_height: 720,
+    comfyui_steps: 9,
     // Thumbnail preset defaults
     default_meeting_types: ['主日敬拜', 'Youth Night', '禱告會'],
     default_title_font: '',
@@ -258,8 +306,8 @@ export default function Settings() {
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="ollama">Ollama (Image Models)</option>
+            <option value="comfyui">ComfyUI</option>
             <option value="stable-diffusion">Stable Diffusion WebUI</option>
-            <option value="comfyui">ComfyUI (Coming Soon)</option>
             <option value="fallback">Fallback (Use Asset Images)</option>
           </select>
           <p className="text-xs text-gray-500 mt-1">
@@ -328,6 +376,88 @@ export default function Settings() {
               </p>
               <p className="text-xs text-green-700 mt-2">
                 This uses the same Ollama service already running for text generation!
+              </p>
+            </div>
+          </>
+        )}
+
+        {settings.thumbnail_ai_backend === 'comfyui' && (
+          <>
+            <ComfyUIStatus serverUrl={settings.comfyui_server_url} />
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                ComfyUI Server URL
+              </label>
+              <input
+                type="text"
+                value={settings.comfyui_server_url}
+                onChange={(e) => handleChange('comfyui_server_url', e.target.value)}
+                placeholder="http://127.0.0.1:8188"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                ComfyUI API endpoint (default: http://127.0.0.1:8188)
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Width
+                </label>
+                <input
+                  type="number"
+                  value={settings.comfyui_width}
+                  onChange={(e) => handleChange('comfyui_width', parseInt(e.target.value))}
+                  min="256"
+                  max="2048"
+                  step="8"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Height
+                </label>
+                <input
+                  type="number"
+                  value={settings.comfyui_height}
+                  onChange={(e) => handleChange('comfyui_height', parseInt(e.target.value))}
+                  min="256"
+                  max="2048"
+                  step="8"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Steps
+                </label>
+                <input
+                  type="number"
+                  value={settings.comfyui_steps}
+                  onChange={(e) => handleChange('comfyui_steps', parseInt(e.target.value))}
+                  min="1"
+                  max="50"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 -mt-2">
+              Image dimensions and sampling steps for generation
+            </p>
+
+            <div className="p-3 bg-purple-50 rounded-lg">
+              <p className="text-xs text-purple-800">
+                <strong>🎨 ComfyUI Setup:</strong> Start ComfyUI with API enabled:
+                <br />
+                <code className="bg-purple-100 px-1 py-0.5 rounded mt-1 inline-block">
+                  python main.py --listen 127.0.0.1 --port 8188
+                </code>
+              </p>
+              <p className="text-xs text-purple-700 mt-2">
+                Using Z-Image Turbo workflow with custom prompt injection
               </p>
             </div>
           </>

@@ -4,6 +4,7 @@
 pyyaml>=6.0
 pillow>=10.0.0
 requests>=2.31.0
+websocket-client>=1.7.0  # For ComfyUI WebSocket connections
 
 # FastAPI Server
 fastapi>=0.109.0

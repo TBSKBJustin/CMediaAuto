@@ -20,6 +20,10 @@ export default function EventCreate() {
         thumbnail_ai_backend: parsed.thumbnail_ai_backend || 'stable-diffusion',
         thumbnail_ai_url: parsed.thumbnail_ai_url || 'http://localhost:7860',
         thumbnail_ai_model: parsed.thumbnail_ai_model || '',
+        comfyui_server_url: parsed.comfyui_server_url || 'http://127.0.0.1:8188',
+        comfyui_width: parsed.comfyui_width || 1280,
+        comfyui_height: parsed.comfyui_height || 720,
+        comfyui_steps: parsed.comfyui_steps || 9,
         // Thumbnail presets
         default_meeting_types: parsed.default_meeting_types || ['主日敬拜', 'Youth Night', '禱告會'],
         default_title_font: parsed.default_title_font || '',
@@ -32,6 +36,11 @@ export default function EventCreate() {
         default_pastor: parsed.default_pastor || '',
         default_logo_size: parsed.default_logo_size || { width: 200, height: 200 },
         default_pastor_size: parsed.default_pastor_size || { width: 250, height: 250 },
+        default_logo_position: parsed.default_logo_position || { align: 'top-left', padding: 30 },
+        default_pastor_position: parsed.default_pastor_position || { align: 'bottom-left', padding: 30 },
+        default_title_position: parsed.default_title_position || { align: 'center', padding: 50, y_offset: -50 },
+        default_subtitle_position: parsed.default_subtitle_position || { align: 'center', padding: 50, y_offset: 50 },
+        default_meeting_position: parsed.default_meeting_position || { align: 'top-right', padding: 50 },
       }
     }
     return {
@@ -42,6 +51,10 @@ export default function EventCreate() {
       thumbnail_ai_backend: 'ollama',
       thumbnail_ai_url: 'http://localhost:11434',
       thumbnail_ai_model: 'x/z-image-turbo',
+      comfyui_server_url: 'http://127.0.0.1:8188',
+      comfyui_width: 1280,
+      comfyui_height: 720,
+      comfyui_steps: 9,
       default_meeting_types: ['主日敬拜', 'Youth Night', '禱告會'],
       default_title_font: '',
       default_subtitle_font: '',
@@ -53,6 +66,11 @@ export default function EventCreate() {
       default_pastor: '',
       default_logo_size: { width: 200, height: 200 },
       default_pastor_size: { width: 250, height: 250 },
+      default_logo_position: { align: 'top-left', padding: 30 },
+      default_pastor_position: { align: 'bottom-left', padding: 30 },
+      default_title_position: { align: 'center', padding: 50, y_offset: -50 },
+      default_subtitle_position: { align: 'center', padding: 50, y_offset: 50 },
+      default_meeting_position: { align: 'top-right', padding: 50 },
     }
   }
   
@@ -76,6 +94,10 @@ export default function EventCreate() {
     thumbnail_ai_backend: defaults.thumbnail_ai_backend,
     thumbnail_ai_url: defaults.thumbnail_ai_url,
     thumbnail_ai_model: defaults.thumbnail_ai_model,
+    comfyui_server_url: defaults.comfyui_server_url,
+    comfyui_width: defaults.comfyui_width,
+    comfyui_height: defaults.comfyui_height,
+    comfyui_steps: defaults.comfyui_steps,
     modules: {
       subtitles: true,
       subtitle_correction: true,
@@ -548,6 +570,7 @@ export default function EventCreate() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="ollama">Ollama (Image Models)</option>
+              <option value="comfyui">ComfyUI</option>
               <option value="stable-diffusion">Stable Diffusion WebUI</option>
               <option value="fallback">Fallback (Use Asset Images)</option>
             </select>
@@ -584,6 +607,117 @@ export default function EventCreate() {
                   : ollamaImageModelsData?.service_available === false
                   ? 'Start Ollama with: ollama serve'
                   : 'Pull an image model: ollama pull x/z-image-turbo'}
+              </p>
+            </div>
+          )}
+
+          {formData.thumbnail_ai_backend === 'comfyui' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  ComfyUI Server URL
+                </label>
+                <input
+                  type="text"
+                  value={formData.comfyui_server_url}
+                  onChange={(e) => setFormData(prev => ({ ...prev, comfyui_server_url: e.target.value }))}
+                  placeholder="http://127.0.0.1:8188"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  ComfyUI API endpoint
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Width
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.comfyui_width}
+                    onChange={(e) => setFormData(prev => ({ ...prev, comfyui_width: parseInt(e.target.value) }))}
+                    min="256"
+                    max="2048"
+                    step="8"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Height
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.comfyui_height}
+                    onChange={(e) => setFormData(prev => ({ ...prev, comfyui_height: parseInt(e.target.value) }))}
+                    min="256"
+                    max="2048"
+                    step="8"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Steps
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.comfyui_steps}
+                    onChange={(e) => setFormData(prev => ({ ...prev, comfyui_steps: parseInt(e.target.value) }))}
+                    min="1"
+                    max="50"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 -mt-2">
+                Image dimensions and sampling steps
+              </p>
+            </>
+          )}
+
+          {formData.thumbnail_ai_backend === 'stable-diffusion' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Stable Diffusion API URL
+                </label>
+                <input
+                  type="text"
+                  value={formData.thumbnail_ai_url}
+                  onChange={(e) => setFormData(prev => ({ ...prev, thumbnail_ai_url: e.target.value }))}
+                  placeholder="http://localhost:7860"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Default: http://localhost:7860 (Automatic1111 WebUI)
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Model Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.thumbnail_ai_model}
+                  onChange={(e) => setFormData(prev => ({ ...prev, thumbnail_ai_model: e.target.value }))}
+                  placeholder="e.g., sd_xl_base_1.0.safetensors"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Leave empty to use WebUI's currently selected model
+                </p>
+              </div>
+            </>
+          )}
+
+          {formData.thumbnail_ai_backend === 'fallback' && (
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-xs text-yellow-800">
+                <strong>⚠️ Note:</strong> Using fallback mode will skip AI generation and use existing images from <code className="bg-yellow-100 px-1 rounded">assets/backgrounds/</code>
               </p>
             </div>
           )}
@@ -1052,6 +1186,84 @@ export default function EventCreate() {
                             className="px-2 py-1 border rounded text-xs"
                           />
                         </div>
+                      </div>
+                    )}
+                    
+                    {/* Subtitle Position */}
+                    {thumbSettings.elements.subtitle && (
+                      <div className="p-2 bg-gray-50 rounded">
+                        <label className="block text-xs font-medium mb-1">小标题位置</label>
+                        <select
+                          value={thumbSettings.subtitle_position?.align || 'center'}
+                          onChange={(e) => setThumbSettings(prev => ({
+                            ...prev,
+                            subtitle_position: { ...prev.subtitle_position, align: e.target.value }
+                          }))}
+                          className="w-full px-2 py-1 border rounded text-xs mb-1"
+                        >
+                          <option value="top-left">左上角</option>
+                          <option value="top-center">顶部居中</option>
+                          <option value="top-right">右上角</option>
+                          <option value="center">居中</option>
+                          <option value="bottom-left">左下角</option>
+                          <option value="bottom-center">底部居中</option>
+                          <option value="bottom-right">右下角</option>
+                        </select>
+                        <div className="grid grid-cols-2 gap-1">
+                          <input
+                            type="number"
+                            value={thumbSettings.subtitle_position?.padding || 50}
+                            onChange={(e) => setThumbSettings(prev => ({
+                              ...prev,
+                              subtitle_position: { ...prev.subtitle_position, padding: parseInt(e.target.value) || 50 }
+                            }))}
+                            placeholder="边距"
+                            className="px-2 py-1 border rounded text-xs"
+                          />
+                          <input
+                            type="number"
+                            value={thumbSettings.subtitle_position?.y_offset || 50}
+                            onChange={(e) => setThumbSettings(prev => ({
+                              ...prev,
+                              subtitle_position: { ...prev.subtitle_position, y_offset: parseInt(e.target.value) || 0 }
+                            }))}
+                            placeholder="Y偏移"
+                            className="px-2 py-1 border rounded text-xs"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Meeting Type Position */}
+                    {thumbSettings.elements.meeting_type && (
+                      <div className="p-2 bg-gray-50 rounded">
+                        <label className="block text-xs font-medium mb-1">聚会类型位置</label>
+                        <select
+                          value={thumbSettings.meeting_position?.align || 'top-right'}
+                          onChange={(e) => setThumbSettings(prev => ({
+                            ...prev,
+                            meeting_position: { ...prev.meeting_position, align: e.target.value }
+                          }))}
+                          className="w-full px-2 py-1 border rounded text-xs mb-1"
+                        >
+                          <option value="top-left">左上角</option>
+                          <option value="top-center">顶部居中</option>
+                          <option value="top-right">右上角</option>
+                          <option value="center">居中</option>
+                          <option value="bottom-left">左下角</option>
+                          <option value="bottom-center">底部居中</option>
+                          <option value="bottom-right">右下角</option>
+                        </select>
+                        <input
+                          type="number"
+                          value={thumbSettings.meeting_position?.padding || 50}
+                          onChange={(e) => setThumbSettings(prev => ({
+                            ...prev,
+                            meeting_position: { ...prev.meeting_position, padding: parseInt(e.target.value) || 50 }
+                          }))}
+                          placeholder="边距"
+                          className="w-full px-2 py-1 border rounded text-xs"
+                        />
                       </div>
                     )}
                   </div>
