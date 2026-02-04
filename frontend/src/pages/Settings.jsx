@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getOllamaModels, getOllamaImageModels } from '../api'
+import { getOllamaModels, getOllamaImageModels, getSystemFonts, getAssets } from '../api'
+import FontSelector from '../components/FontSelector'
 
 export default function Settings() {
   const [settings, setSettings] = useState({
@@ -11,6 +12,18 @@ export default function Settings() {
     thumbnail_ai_backend: 'ollama',
     thumbnail_ai_url: 'http://localhost:11434',
     thumbnail_ai_model: 'x/z-image-turbo',
+    // Thumbnail preset defaults
+    default_meeting_types: ['主日敬拜', 'Youth Night', '禱告會'],
+    default_title_font: '',
+    default_subtitle_font: '',
+    default_meeting_font: '',
+    default_title_size: 96,
+    default_subtitle_size: 64,
+    default_meeting_size: 48,
+    default_logo: '',
+    default_pastor: '',
+    default_logo_size: { width: 200, height: 200 },
+    default_pastor_size: { width: 250, height: 250 },
   })
 
   const [saved, setSaved] = useState(false)
@@ -34,6 +47,23 @@ export default function Settings() {
     queryFn: getOllamaImageModels
   })
 
+  // Fetch system fonts
+  const { data: fontsData } = useQuery({
+    queryKey: ['systemFonts'],
+    queryFn: getSystemFonts
+  })
+
+  // Fetch assets
+  const { data: logosData } = useQuery({
+    queryKey: ['logos'],
+    queryFn: () => getAssets('logos')
+  })
+
+  const { data: pastorsData } = useQuery({
+    queryKey: ['pastor'],
+    queryFn: () => getAssets('pastor')
+  })
+
   const handleSave = () => {
     localStorage.setItem('cmas_global_settings', JSON.stringify(settings))
     setSaved(true)
@@ -42,6 +72,24 @@ export default function Settings() {
 
   const handleChange = (field, value) => {
     setSettings(prev => ({ ...prev, [field]: value }))
+  }
+
+  const addMeetingType = () => {
+    setSettings(prev => ({
+      ...prev,
+      default_meeting_types: [...prev.default_meeting_types, '新聚會']
+    }))
+  }
+
+  const updateMeetingType = (index, value) => {
+    const newTypes = [...settings.default_meeting_types]
+    newTypes[index] = value
+    setSettings(prev => ({ ...prev, default_meeting_types: newTypes }))
+  }
+
+  const removeMeetingType = (index) => {
+    const newTypes = settings.default_meeting_types.filter((_, i) => i !== index)
+    setSettings(prev => ({ ...prev, default_meeting_types: newTypes }))
   }
 
   return (
@@ -333,6 +381,282 @@ export default function Settings() {
             </p>
           </div>
         )}
+      </div>
+
+      {/* Thumbnail Preset Settings */}
+      <div className="bg-white rounded-lg shadow p-6 space-y-4">
+        <div className="border-b pb-3">
+          <h3 className="text-lg font-semibold text-gray-900">Thumbnail Preset Settings</h3>
+          <p className="text-sm text-gray-600 mt-1">
+            Configure default thumbnail composition preferences
+          </p>
+        </div>
+
+        {/* Meeting Types Presets */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            预设聚会类型
+          </label>
+          <div className="space-y-2">
+            {settings.default_meeting_types.map((type, idx) => (
+              <div key={idx} className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={type}
+                  onChange={(e) => updateMeetingType(idx, e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="聚会类型名称"
+                />
+                <button 
+                  onClick={() => removeMeetingType(idx)}
+                  className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                  disabled={settings.default_meeting_types.length <= 1}
+                >
+                  删除
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={addMeetingType}
+              className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              添加聚会类型
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            这些选项会在创建 Event 时出现在聚会类型下拉列表中
+          </p>
+        </div>
+
+        {/* Font Settings */}
+        <div className="space-y-3 pt-3 border-t">
+          <h4 className="text-sm font-medium text-gray-700">默认字体设置</h4>
+          
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">
+              标题字体
+            </label>
+            <FontSelector
+              value={settings.default_title_font}
+              onChange={(value) => handleChange('default_title_font', value)}
+              fonts={fontsData?.fonts}
+              placeholder="选择或输入标题字体"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">
+              小标题字体
+            </label>
+            <FontSelector
+              value={settings.default_subtitle_font}
+              onChange={(value) => handleChange('default_subtitle_font', value)}
+              fonts={fontsData?.fonts}
+              placeholder="选择或输入小标题字体"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">
+              聚会类型字体
+            </label>
+            <FontSelector
+              value={settings.default_meeting_font}
+              onChange={(value) => handleChange('default_meeting_font', value)}
+              fonts={fontsData?.fonts}
+              placeholder="选择或输入聚会类型字体"
+            />
+          </div>
+
+          <p className="text-xs text-gray-500">
+            {fontsData?.total 
+              ? `找到 ${fontsData.total} 个系统字体，其中 ${fontsData.fonts.filter(f => f.chinese_support).length} 个支持中文`
+              : '正在检测系统字体...'}
+          </p>
+        </div>
+
+        {/* Font Size Settings */}
+        <div className="space-y-3 pt-3 border-t">
+          <h4 className="text-sm font-medium text-gray-700">默认字号设置</h4>
+          
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">
+                标题字号
+              </label>
+              <input
+                type="number"
+                value={settings.default_title_size}
+                onChange={(e) => handleChange('default_title_size', parseInt(e.target.value))}
+                min="24"
+                max="200"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">
+                小标题字号
+              </label>
+              <input
+                type="number"
+                value={settings.default_subtitle_size}
+                onChange={(e) => handleChange('default_subtitle_size', parseInt(e.target.value))}
+                min="24"
+                max="200"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">
+                聚会类型字号
+              </label>
+              <input
+                type="number"
+                value={settings.default_meeting_size}
+                onChange={(e) => handleChange('default_meeting_size', parseInt(e.target.value))}
+                min="24"
+                max="200"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-gray-500">
+            💡 文字过长时会自动缩小以适应画面
+          </p>
+        </div>
+
+        {/* Asset Settings */}
+        <div className="space-y-3 pt-3 border-t">
+          <h4 className="text-sm font-medium text-gray-700">默认图片资源</h4>
+          
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">
+              教会 Logo
+            </label>
+            <select
+              value={settings.default_logo}
+              onChange={(e) => handleChange('default_logo', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            >
+              <option value="">第一个可用图片</option>
+              {logosData?.assets?.map(asset => (
+                <option key={asset.path} value={asset.path}>
+                  {asset.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              📁 上传图片到 <code className="bg-gray-100 px-1 rounded">assets/logos/</code> 目录
+              {logosData?.total && ` (已有 ${logosData.total} 个)`}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">
+              牧师照片
+            </label>
+            <select
+              value={settings.default_pastor}
+              onChange={(e) => handleChange('default_pastor', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            >
+              <option value="">第一个可用图片</option>
+              {pastorsData?.assets?.map(asset => (
+                <option key={asset.path} value={asset.path}>
+                  {asset.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              📁 上传图片到 <code className="bg-gray-100 px-1 rounded">assets/pastor/</code> 目录
+              {pastorsData?.total && ` (已有 ${pastorsData.total} 个)`}
+            </p>
+          </div>
+        </div>
+
+        {/* Image Size Settings */}
+        <div className="space-y-3 pt-3 border-t">
+          <h4 className="text-sm font-medium text-gray-700">图片尺寸设置</h4>
+          
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">
+              Logo 尺寸（像素）
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="number"
+                value={settings.default_logo_size?.width || 200}
+                onChange={(e) => handleChange('default_logo_size', {
+                  ...settings.default_logo_size,
+                  width: parseInt(e.target.value) || 200
+                })}
+                placeholder="宽度"
+                min="50"
+                max="800"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              />
+              <input
+                type="number"
+                value={settings.default_logo_size?.height || 200}
+                onChange={(e) => handleChange('default_logo_size', {
+                  ...settings.default_logo_size,
+                  height: parseInt(e.target.value) || 200
+                })}
+                placeholder="高度"
+                min="50"
+                max="800"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Logo 最大尺寸（默认: 200×200）
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">
+              Pastor 图片尺寸（像素）
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="number"
+                value={settings.default_pastor_size?.width || 250}
+                onChange={(e) => handleChange('default_pastor_size', {
+                  ...settings.default_pastor_size,
+                  width: parseInt(e.target.value) || 250
+                })}
+                placeholder="宽度"
+                min="50"
+                max="800"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              />
+              <input
+                type="number"
+                value={settings.default_pastor_size?.height || 250}
+                onChange={(e) => handleChange('default_pastor_size', {
+                  ...settings.default_pastor_size,
+                  height: parseInt(e.target.value) || 250
+                })}
+                placeholder="高度"
+                min="50"
+                max="800"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Pastor 图片最大尺寸（默认: 250×250）
+            </p>
+          </div>
+        </div>
+
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-xs text-blue-800">
+            <strong>💡 提示：</strong> 这些设置会作为创建新 Event 时的默认值，你仍然可以在每个 Event 中单独调整。
+          </p>
+        </div>
       </div>
 
       {/* Resource Usage Info */}

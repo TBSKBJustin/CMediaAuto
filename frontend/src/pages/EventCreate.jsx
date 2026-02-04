@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { createEvent, getWhisperModels, getOllamaModels, getOllamaImageModels } from '../api'
+import { createEvent, getWhisperModels, getOllamaModels, getOllamaImageModels, getSystemFonts, getAssets } from '../api'
+import FontSelector from '../components/FontSelector'
 
 export default function EventCreate() {
   const navigate = useNavigate()
@@ -19,6 +20,18 @@ export default function EventCreate() {
         thumbnail_ai_backend: parsed.thumbnail_ai_backend || 'stable-diffusion',
         thumbnail_ai_url: parsed.thumbnail_ai_url || 'http://localhost:7860',
         thumbnail_ai_model: parsed.thumbnail_ai_model || '',
+        // Thumbnail presets
+        default_meeting_types: parsed.default_meeting_types || ['主日敬拜', 'Youth Night', '禱告會'],
+        default_title_font: parsed.default_title_font || '',
+        default_subtitle_font: parsed.default_subtitle_font || '',
+        default_meeting_font: parsed.default_meeting_font || '',
+        default_title_size: parsed.default_title_size || 96,
+        default_subtitle_size: parsed.default_subtitle_size || 64,
+        default_meeting_size: parsed.default_meeting_size || 48,
+        default_logo: parsed.default_logo || '',
+        default_pastor: parsed.default_pastor || '',
+        default_logo_size: parsed.default_logo_size || { width: 200, height: 200 },
+        default_pastor_size: parsed.default_pastor_size || { width: 250, height: 250 },
       }
     }
     return {
@@ -29,6 +42,17 @@ export default function EventCreate() {
       thumbnail_ai_backend: 'ollama',
       thumbnail_ai_url: 'http://localhost:11434',
       thumbnail_ai_model: 'x/z-image-turbo',
+      default_meeting_types: ['主日敬拜', 'Youth Night', '禱告會'],
+      default_title_font: '',
+      default_subtitle_font: '',
+      default_meeting_font: '',
+      default_title_size: 96,
+      default_subtitle_size: 64,
+      default_meeting_size: 48,
+      default_logo: '',
+      default_pastor: '',
+      default_logo_size: { width: 200, height: 200 },
+      default_pastor_size: { width: 250, height: 250 },
     }
   }
   
@@ -63,6 +87,31 @@ export default function EventCreate() {
       publish_website: false,
     }
   })
+
+  // Thumbnail settings state
+  const [showThumbSettings, setShowThumbSettings] = useState(false)
+  const [thumbSettings, setThumbSettings] = useState({
+    elements: {
+      title: true,
+      subtitle: true,
+      meeting_type: true,
+      logo: true,
+      pastor: true
+    },
+    subtitle_text: '',
+    meeting_type: defaults.default_meeting_types[0] || '',
+    title_font_size: defaults.default_title_size,
+    subtitle_font_size: defaults.default_subtitle_size,
+    meeting_font_size: defaults.default_meeting_size,
+    title_font_path: defaults.default_title_font,
+    subtitle_font_path: defaults.default_subtitle_font,
+    meeting_font_path: defaults.default_meeting_font,
+    logo_path: defaults.default_logo,
+    pastor_path: defaults.default_pastor,
+    background_path: null,
+    logo_size: defaults.default_logo_size,
+    pastor_size: defaults.default_pastor_size
+  })
   
   // Fetch available models
   const { data: whisperModelsData } = useQuery({
@@ -78,6 +127,22 @@ export default function EventCreate() {
   const { data: ollamaImageModelsData } = useQuery({
     queryKey: ['ollamaImageModels'],
     queryFn: getOllamaImageModels
+  })
+
+  // Fetch system fonts and assets
+  const { data: fontsData } = useQuery({
+    queryKey: ['systemFonts'],
+    queryFn: getSystemFonts
+  })
+
+  const { data: logosData } = useQuery({
+    queryKey: ['logos'],
+    queryFn: () => getAssets('logos')
+  })
+
+  const { data: pastorsData } = useQuery({
+    queryKey: ['pastor'],
+    queryFn: () => getAssets('pastor')
   })
   
   // Set default models when data loads
@@ -108,7 +173,14 @@ export default function EventCreate() {
   
   const handleSubmit = (e) => {
     e.preventDefault()
-    createMutation.mutate(formData)
+    
+    // Include thumbnail settings in the submission
+    const eventData = {
+      ...formData,
+      thumbnail_settings: thumbSettings
+    }
+    
+    createMutation.mutate(eventData)
   }
   
   const handleChange = (e) => {
@@ -508,6 +580,367 @@ export default function EventCreate() {
                   ? 'Start Ollama with: ollama serve'
                   : 'Pull an image model: ollama pull x/z-image-turbo'}
               </p>
+            </div>
+          )}
+        </div>
+
+        {/* Thumbnail Composition Settings */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <button
+            type="button"
+            onClick={() => setShowThumbSettings(!showThumbSettings)}
+            className="w-full flex items-center justify-between"
+          >
+            <div className="text-left">
+              <h3 className="text-lg font-semibold text-gray-900">
+                🎨 Thumbnail Composition Settings
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Customize thumbnail elements, fonts, and layout
+              </p>
+            </div>
+            <svg 
+              className={`w-5 h-5 transition-transform text-gray-400 ${showThumbSettings ? 'rotate-180' : ''}`}
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {showThumbSettings && (
+            <div className="mt-6 space-y-6 border-t pt-6">
+              {/* Element Toggles */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-3">显示元素</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { key: 'title', label: '📝 标题', desc: '画面中央' },
+                    { key: 'subtitle', label: '📄 小标题', desc: '标题下方' },
+                    { key: 'meeting_type', label: '🏷️ 聚会类型', desc: '右上角' },
+                    { key: 'logo', label: '🏛️ 教会标志', desc: '左上角' },
+                    { key: 'pastor', label: '👤 牧师照片', desc: '左下角' }
+                  ].map(({ key, label, desc }) => (
+                    <label key={key} className="flex items-start gap-2 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={thumbSettings.elements[key]}
+                        onChange={(e) => setThumbSettings(prev => ({
+                          ...prev,
+                          elements: {
+                            ...prev.elements,
+                            [key]: e.target.checked
+                          }
+                        }))}
+                        className="w-4 h-4 mt-0.5 text-blue-600 rounded"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">{label}</span>
+                        <span className="text-xs text-gray-500">{desc}</span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Text Content */}
+              {(thumbSettings.elements.subtitle || thumbSettings.elements.meeting_type) && (
+                <div className="space-y-3 border-t pt-4">
+                  <h4 className="text-sm font-medium text-gray-700">文字内容</h4>
+                  
+                  {thumbSettings.elements.subtitle && (
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">
+                        小标题文字
+                      </label>
+                      <input
+                        type="text"
+                        value={thumbSettings.subtitle_text}
+                        onChange={(e) => setThumbSettings(prev => ({
+                          ...prev,
+                          subtitle_text: e.target.value
+                        }))}
+                        placeholder="留空则使用讲员名字"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      />
+                    </div>
+                  )}
+
+                  {thumbSettings.elements.meeting_type && (
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">
+                        聚会类型
+                      </label>
+                      <select
+                        value={thumbSettings.meeting_type}
+                        onChange={(e) => setThumbSettings(prev => ({
+                          ...prev,
+                          meeting_type: e.target.value
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      >
+                        <option value="">不显示</option>
+                        {defaults.default_meeting_types.map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Font and Size Settings */}
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="text-sm font-medium text-gray-700">字体与字号</h4>
+                
+                {thumbSettings.elements.title && (
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-600 font-medium">标题</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="col-span-2">
+                        <FontSelector
+                          value={thumbSettings.title_font_path || ''}
+                          onChange={(value) => setThumbSettings(prev => ({
+                            ...prev,
+                            title_font_path: value || null
+                          }))}
+                          fonts={fontsData?.fonts}
+                          placeholder="选择或输入标题字体"
+                        />
+                      </div>
+                      <input
+                        type="number"
+                        value={thumbSettings.title_font_size}
+                        onChange={(e) => setThumbSettings(prev => ({
+                          ...prev,
+                          title_font_size: parseInt(e.target.value)
+                        }))}
+                        min="24"
+                        max="200"
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs text-center"
+                        placeholder="字号"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {thumbSettings.elements.subtitle && (
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-600 font-medium">小标题</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="col-span-2">
+                        <FontSelector
+                          value={thumbSettings.subtitle_font_path || ''}
+                          onChange={(value) => setThumbSettings(prev => ({
+                            ...prev,
+                            subtitle_font_path: value || null
+                          }))}
+                          fonts={fontsData?.fonts}
+                          placeholder="选择或输入小标题字体"
+                        />
+                      </div>
+                      <input
+                        type="number"
+                        value={thumbSettings.subtitle_font_size}
+                        onChange={(e) => setThumbSettings(prev => ({
+                          ...prev,
+                          subtitle_font_size: parseInt(e.target.value)
+                        }))}
+                        min="24"
+                        max="200"
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs text-center"
+                        placeholder="字号"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {thumbSettings.elements.meeting_type && (
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-600 font-medium">聚会类型</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="col-span-2">
+                        <FontSelector
+                          value={thumbSettings.meeting_font_path || ''}
+                          onChange={(value) => setThumbSettings(prev => ({
+                            ...prev,
+                            meeting_font_path: value || null
+                          }))}
+                          fonts={fontsData?.fonts}
+                          placeholder="选择或输入聚会类型字体"
+                        />
+                      </div>
+                      <input
+                        type="number"
+                        value={thumbSettings.meeting_font_size}
+                        onChange={(e) => setThumbSettings(prev => ({
+                          ...prev,
+                          meeting_font_size: parseInt(e.target.value)
+                        }))}
+                        min="24"
+                        max="200"
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs text-center"
+                        placeholder="字号"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-xs text-gray-500">
+                  💡 文字过长时会自动缩小字号以适应画面
+                </p>
+              </div>
+
+              {/* Image Resources */}
+              {(thumbSettings.elements.logo || thumbSettings.elements.pastor) && (
+                <div className="space-y-3 border-t pt-4">
+                  <h4 className="text-sm font-medium text-gray-700">图片资源</h4>
+                  
+                  {thumbSettings.elements.logo && (
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">
+                        教会 Logo
+                      </label>
+                      <select
+                        value={thumbSettings.logo_path || ''}
+                        onChange={(e) => setThumbSettings(prev => ({
+                          ...prev,
+                          logo_path: e.target.value || null
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      >
+                        <option value="">使用默认</option>
+                        {logosData?.assets?.map(asset => (
+                          <option key={asset.path} value={asset.path}>
+                            {asset.name}
+                          </option>
+                        ))}
+                      </select>
+                      {logosData?.total === 0 && (
+                        <p className="text-xs text-amber-600 mt-1">
+                          📁 上传图片到 assets/logos/ 目录
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {thumbSettings.elements.pastor && (
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">
+                        牧师照片
+                      </label>
+                      <select
+                        value={thumbSettings.pastor_path || ''}
+                        onChange={(e) => setThumbSettings(prev => ({
+                          ...prev,
+                          pastor_path: e.target.value || null
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      >
+                        <option value="">使用默认</option>
+                        {pastorsData?.assets?.map(asset => (
+                          <option key={asset.path} value={asset.path}>
+                            {asset.name}
+                          </option>
+                        ))}
+                      </select>
+                      {pastorsData?.total === 0 && (
+                        <p className="text-xs text-amber-600 mt-1">
+                          📁 上传图片到 assets/pastor/ 目录
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Image Size Controls */}
+                  <div className="space-y-3 border-t pt-3 mt-3">
+                    <h4 className="text-xs font-medium text-gray-700">图片尺寸（像素）</h4>
+                    
+                    {thumbSettings.elements.logo && (
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Logo 尺寸</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="number"
+                            value={thumbSettings.logo_size?.width || 200}
+                            onChange={(e) => setThumbSettings(prev => ({
+                              ...prev,
+                              logo_size: {
+                                ...prev.logo_size,
+                                width: parseInt(e.target.value) || 200
+                              }
+                            }))}
+                            placeholder="宽度"
+                            min="50"
+                            max="800"
+                            className="px-2 py-1.5 border border-gray-300 rounded text-xs text-center"
+                          />
+                          <input
+                            type="number"
+                            value={thumbSettings.logo_size?.height || 200}
+                            onChange={(e) => setThumbSettings(prev => ({
+                              ...prev,
+                              logo_size: {
+                                ...prev.logo_size,
+                                height: parseInt(e.target.value) || 200
+                              }
+                            }))}
+                            placeholder="高度"
+                            min="50"
+                            max="800"
+                            className="px-2 py-1.5 border border-gray-300 rounded text-xs text-center"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
+                    {thumbSettings.elements.pastor && (
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Pastor 尺寸</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="number"
+                            value={thumbSettings.pastor_size?.width || 250}
+                            onChange={(e) => setThumbSettings(prev => ({
+                              ...prev,
+                              pastor_size: {
+                                ...prev.pastor_size,
+                                width: parseInt(e.target.value) || 250
+                              }
+                            }))}
+                            placeholder="宽度"
+                            min="50"
+                            max="800"
+                            className="px-2 py-1.5 border border-gray-300 rounded text-xs text-center"
+                          />
+                          <input
+                            type="number"
+                            value={thumbSettings.pastor_size?.height || 250}
+                            onChange={(e) => setThumbSettings(prev => ({
+                              ...prev,
+                              pastor_size: {
+                                ...prev.pastor_size,
+                                height: parseInt(e.target.value) || 250
+                              }
+                            }))}
+                            placeholder="高度"
+                            min="50"
+                            max="800"
+                            className="px-2 py-1.5 border border-gray-300 rounded text-xs text-center"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs text-blue-800">
+                  <strong>💡 提示：</strong> 背景图会优先使用 AI 生成的图片。如果 AI 生成失败，则使用 assets/backgrounds/ 中的图片作为备选。
+                </p>
+              </div>
             </div>
           )}
         </div>

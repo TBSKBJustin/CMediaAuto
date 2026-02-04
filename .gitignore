@@ -77,6 +77,12 @@ config/*_secret.json
 !assets/**/*.jpeg
 !assets/**/*.png
 
+# Exclude user-uploaded images (logos and pastor photos)
+assets/logos/*
+!assets/logos/.gitkeep
+assets/pastor/*
+!assets/pastor/.gitkeep
+
 # Models
 models/
 *.bin

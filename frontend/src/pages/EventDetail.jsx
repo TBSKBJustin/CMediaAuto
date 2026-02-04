@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Upload, Play, RefreshCw, CheckCircle, AlertCircle, Loader, Grid } from 'lucide-react'
-import { getEvent, attachVideo, runWorkflow, getWorkflowProgress, getEventModules } from '../api'
+import { Upload, Play, RefreshCw, CheckCircle, AlertCircle, Loader, Grid, Settings } from 'lucide-react'
+import { getEvent, attachVideo, runWorkflow, getWorkflowProgress, getEventModules, updateEventConfig } from '../api'
 import WorkflowProgress from '../components/WorkflowProgress'
 import ModuleCard from '../components/ModuleCard'
+import EventSettingsModal from '../components/EventSettingsModal'
 
 export default function EventDetail() {
   const { eventId } = useParams()
   const queryClient = useQueryClient()
   const [videoPath, setVideoPath] = useState('')
   const [showUploadModal, setShowUploadModal] = useState(false)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [isPolling, setIsPolling] = useState(false)
   const [viewMode, setViewMode] = useState('modules') // 'modules' or 'workflow'
   const [forceRerun, setForceRerun] = useState(false)
@@ -91,6 +93,15 @@ export default function EventDetail() {
           <p className="text-gray-600 mt-1">{event.speaker} • {event.date}</p>
         </div>
         <div className="flex gap-3">
+          {/* Settings Button */}
+          <button
+            onClick={() => setShowSettingsModal(true)}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
+          >
+            <Settings size={16} />
+            Settings
+          </button>
+
           {/* View Mode Toggle */}
           <div className="flex border border-gray-300 rounded-lg overflow-hidden">
             <button
@@ -256,6 +267,14 @@ export default function EventDetail() {
         </div>
       )}
         </>
+      )}
+      
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <EventSettingsModal
+          event={event}
+          onClose={() => setShowSettingsModal(false)}
+        />
       )}
       
       {/* Upload Modal */}

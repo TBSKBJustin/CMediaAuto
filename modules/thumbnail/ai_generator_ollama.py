@@ -118,17 +118,19 @@ class ImageGenerator:
             lines = [line for line in clean_prompt.split('\n') if not line.strip().startswith('#')]
             clean_prompt = ' '.join(lines).strip()
             
-            # Prepend dimension settings to the prompt
-            full_prompt = f"/set width {width}\n/set height {height}\n{clean_prompt}"
-            
             self.logger.info(f"Generating {width}x{height} image with prompt: {clean_prompt[:100]}...")
             
             payload = {
                 "model": self.model,
-                "prompt": full_prompt,
+                "prompt": clean_prompt,
                 "stream": False,
                 "images": [],  # Required for image generation
                 "format": "",  # Don't use json format for image models
+                "options": {
+                    "width": width,
+                    "height": height,
+                    "num_predict": 100  # Controls generation steps
+                }
             }
             
             response = requests.post(

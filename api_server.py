@@ -158,6 +158,71 @@ async def attach_video(event_id: str, video_data: VideoAttach):
     
     # Validate video path exists
     video_path = Path(video_data.video_path)
+
+
+@app.put('/api/events/{event_id}/config')
+async def update_event_config(event_id: str, config_data: Dict[str, Any]):
+    """Update event configuration"""
+    try:
+        # Load existing event
+        event = event_manager.load_event(event_id)
+        if not event:
+            raise HTTPException(status_code=404, detail='Event not found')
+        
+        # Update config file
+        from pathlib import Path
+        import json
+        
+        event_dir = Path("events") / event_id
+        config_file = event_dir / "event.json"
+        
+        if not config_file.exists():
+            raise HTTPException(status_code=404, detail='Event config file not found')
+        
+        # Read current config
+        with open(config_file, 'r', encoding='utf-8') as f:
+            current_config = json.load(f)
+        
+        # Update fields (allow updating most fields except event_id and created_at)
+        allowed_fields = [
+            'title', 'speaker', 'series', 'scripture', 'language',
+            'whisper_model', 'subtitle_max_length', 'subtitle_split_on_word',
+            'ai_model', 'ai_correct_subtitles', 'ai_generate_summary',
+            'ai_summary_length', 'ai_summary_languages', 'ai_unload_model_after',
+            'thumbnail_ai_backend', 'thumbnail_ai_url', 'thumbnail_ai_model',
+            'thumbnail_settings', 'modules', 'ai_content_settings'
+        ]
+        
+        for field in allowed_fields:
+            if field in config_data:
+                current_config[field] = config_data[field]
+        
+        # Save updated config
+        with open(config_file, 'w', encoding='utf-8') as f:
+            json.dump(current_config, f, indent=2, ensure_ascii=False)
+        
+        return {
+            'message': 'Event configuration updated successfully',
+            'event_id': event_id,
+            'updated_fields': [k for k in config_data.keys() if k in allowed_fields]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to update event config: {str(e)}')
+
+
+@app.post('/api/events/{event_id}/attach')
+async def attach_video(event_id: str, video_data: VideoAttach):
+    """Attach video to event"""
+    # Check if event exists
+    event = event_manager.load_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail='Event not found')
+    
+    # Validate video path exists
+    video_path = Path(video_data.video_path)
     if not video_path.exists():
         raise HTTPException(status_code=400, detail='Video file does not exist')
     
@@ -599,6 +664,52 @@ async def get_ollama_image_models():
             'service_available': False,
             'error': str(e)
         }
+
+
+@app.get('/api/fonts/system')
+async def get_system_fonts():
+    """Get list of available system fonts"""
+    try:
+        from modules.thumbnail.composer_pillow import ThumbnailComposer
+        
+        fonts = ThumbnailComposer.get_system_fonts()
+        
+        return {
+            'fonts': fonts,
+            'total': len(fonts)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get system fonts: {str(e)}")
+
+
+@app.get('/api/assets/{asset_type}')
+async def list_assets(asset_type: str):
+    """List available assets (logos, pastors, backgrounds)"""
+    try:
+        valid_types = ['logos', 'pastor', 'backgrounds']
+        if asset_type not in valid_types:
+            raise HTTPException(status_code=400, detail=f"Invalid asset type. Must be one of: {valid_types}")
+        
+        assets_dir = Path("assets") / asset_type
+        assets_dir.mkdir(parents=True, exist_ok=True)
+        
+        assets = []
+        for file in assets_dir.glob("*"):
+            if file.suffix.lower() in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+                assets.append({
+                    'name': file.stem,
+                    'filename': file.name,
+                    'path': str(file),
+                    'size': file.stat().st_size
+                })
+        
+        return {
+            'assets': assets,
+            'total': len(assets),
+            'asset_type': asset_type
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list assets: {str(e)}")
 
 
 if __name__ == '__main__':

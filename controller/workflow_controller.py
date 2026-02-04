@@ -449,8 +449,35 @@ class WorkflowController:
             
             # Get event details
             title = event_config.get("title", "Untitled")
-            scripture = event_config.get("scripture", "")
             speaker = event_config.get("speaker", "")
+            
+            # Get thumbnail settings (with defaults)
+            thumb_settings = event_config.get("thumbnail_settings", {})
+            
+            # Elements configuration
+            elements = thumb_settings.get("elements", {})
+            show_title = elements.get("title", True)
+            show_subtitle = elements.get("subtitle", True)
+            show_meeting_type = elements.get("meeting_type", True)
+            show_logo = elements.get("logo", True)
+            show_pastor = elements.get("pastor", True)
+            
+            # Text content
+            main_title = title if show_title else None
+            subtitle = thumb_settings.get("subtitle_text") or (speaker if show_subtitle else None)
+            meeting_type = thumb_settings.get("meeting_type") if show_meeting_type else None
+            
+            # Font settings
+            title_font_size = thumb_settings.get("title_font_size", 96)
+            subtitle_font_size = thumb_settings.get("subtitle_font_size", 64)
+            meeting_font_size = thumb_settings.get("meeting_font_size", 48)
+            title_font_path = thumb_settings.get("title_font_path")
+            subtitle_font_path = thumb_settings.get("subtitle_font_path")
+            meeting_font_path = thumb_settings.get("meeting_font_path")
+            
+            # Image size settings
+            logo_size = thumb_settings.get("logo_size", {"width": 200, "height": 200})
+            pastor_size = thumb_settings.get("pastor_size", {"width": 250, "height": 250})
             
             # Output path
             thumbnail_path = output_dir / "thumbnail.jpg"
@@ -465,40 +492,64 @@ class WorkflowController:
                 background = str(ai_bg)
                 self.logger.info("Using AI-generated background")
             else:
-                # Fallback to assets directory
-                assets_dir = Path("assets")
-                bg_dir = assets_dir / "backgrounds"
-                if bg_dir.exists():
-                    bg_files = list(bg_dir.glob("*.jpg")) + list(bg_dir.glob("*.png"))
-                    if bg_files:
-                        background = str(bg_files[0])
-                        self.logger.info(f"Using fallback background: {background}")
+                # Check if user specified background
+                if thumb_settings.get("background_path"):
+                    background = thumb_settings.get("background_path")
+                else:
+                    # Fallback to assets directory
+                    assets_dir = Path("assets")
+                    bg_dir = assets_dir / "backgrounds"
+                    if bg_dir.exists():
+                        bg_files = list(bg_dir.glob("*.jpg")) + list(bg_dir.glob("*.png"))
+                        if bg_files:
+                            background = str(bg_files[0])
+                            self.logger.info(f"Using fallback background: {background}")
             
-            # Try to find a logo
+            # Get logo (user-specified or default)
             logo = None
-            assets_dir = Path("assets")
-            logo_dir = assets_dir / "logos"
-            if logo_dir.exists():
-                logo_files = list(logo_dir.glob("*.png"))
-                if logo_files:
-                    logo = str(logo_files[0])
+            if show_logo:
+                if thumb_settings.get("logo_path"):
+                    logo = thumb_settings.get("logo_path")
+                else:
+                    # Use first logo from assets
+                    assets_dir = Path("assets")
+                    logo_dir = assets_dir / "logos"
+                    if logo_dir.exists():
+                        logo_files = list(logo_dir.glob("*.png")) + list(logo_dir.glob("*.jpg"))
+                        if logo_files:
+                            logo = str(logo_files[0])
             
-            # Try to find pastor portrait
+            # Get pastor portrait (user-specified or default)
             pastor = None
-            pastor_dir = assets_dir / "pastor"
-            if pastor_dir.exists():
-                pastor_files = list(pastor_dir.glob("*.jpg")) + list(pastor_dir.glob("*.png"))
-                if pastor_files:
-                    pastor = str(pastor_files[0])
+            if show_pastor:
+                if thumb_settings.get("pastor_path"):
+                    pastor = thumb_settings.get("pastor_path")
+                else:
+                    # Use first pastor from assets
+                    assets_dir = Path("assets")
+                    pastor_dir = assets_dir / "pastor"
+                    if pastor_dir.exists():
+                        pastor_files = list(pastor_dir.glob("*.jpg")) + list(pastor_dir.glob("*.png"))
+                        if pastor_files:
+                            pastor = str(pastor_files[0])
             
-            # Compose thumbnail
+            # Compose thumbnail with new flexible parameters
             success, error = composer.compose(
                 output_path=str(thumbnail_path),
-                title=title,
-                scripture=scripture if scripture else None,
+                title=main_title,
+                subtitle=subtitle,
+                meeting_type=meeting_type,
                 background=background,
-                pastor=pastor,
-                logo=logo
+                pastor_image=pastor,
+                logo=logo,
+                title_font_size=title_font_size,
+                subtitle_font_size=subtitle_font_size,
+                meeting_font_size=meeting_font_size,
+                title_font_path=title_font_path,
+                subtitle_font_path=subtitle_font_path,
+                meeting_font_path=meeting_font_path,
+                logo_size=logo_size,
+                pastor_size=pastor_size
             )
             
             if success:

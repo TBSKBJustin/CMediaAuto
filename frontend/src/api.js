@@ -18,6 +18,11 @@ export const getEvent = async (eventId) => {
   return data
 }
 
+export const updateEventConfig = async (eventId, configData) => {
+  const { data } = await api.put(`/events/${eventId}/config`, configData)
+  return data
+}
+
 export const createEvent = async (eventData) => {
   const { data } = await api.post('/events', eventData)
   return data
@@ -73,6 +78,17 @@ export const getOllamaModels = async () => {
 
 export const getOllamaImageModels = async () => {
   const { data } = await api.get('/models/ollama-image')
+  return data
+}
+
+// Fonts & Assets
+export const getSystemFonts = async () => {
+  const { data } = await api.get('/fonts/system')
+  return data
+}
+
+export const getAssets = async (assetType) => {
+  const { data } = await api.get(`/assets/${assetType}`)
   return data
 }
 
